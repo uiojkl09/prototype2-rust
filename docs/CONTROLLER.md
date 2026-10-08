@@ -15,6 +15,11 @@ launch the viewer, and focus its window. It logs the selected XInput slot (0..3)
 | Menu / Start | Exit, once per press |
 
 These are authored inspection mappings, not recovered Prototype 2 gameplay controls.
+The separate `animate` mode uses A/B for its seven-clip bank (run, idle, walk,
+sprint, jump, bare punch and bare kick), X to pause, Y to restart, LB to slow and
+Menu to exit. Sticks orbit/zoom; RB enables the idle/walk/run blend, with left-stick
+magnitude selecting inspection speed and right stick orbiting. See ANIMATION.md.
+Selecting punch/kick inspects original clips; it does not execute combat actions.
 Controller-driven Heller movement, action mapping, rumble and rebinding remain future
 work. The renderer-independent input layer can supply recorded controller samples
 to later simulation; camera timing/speeds must not be used as retail movement rules.

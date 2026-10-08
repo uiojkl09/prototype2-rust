@@ -99,6 +99,189 @@ fn skeleton() -> Skeleton {
         inverse_bind: vec![Mat4::IDENTITY, tip.inverse()],
     }
 }
+fn clip_with_channels(template: &[u8], channels: &[Vec<u8>]) -> Vec<u8> {
+    let chunks = p3d::parse(template).unwrap();
+    let clip = chunks.iter().find(|n| n.id == 0x121000).unwrap();
+    let wrapper = chunks.iter().find(|n| n.id == 0x121002).unwrap();
+    let group = chunks.iter().find(|n| n.id == 0x121001).unwrap();
+    let mut payload = group.payload(template).to_vec();
+    let len = payload.len();
+    payload[len - 4..].copy_from_slice(&(channels.len() as u32).to_le_bytes());
+    let mut children = template[clip.offset + clip.data_size..wrapper.offset].to_vec();
+    children.extend(node(
+        0x121002,
+        &[],
+        &node(0x121001, &payload, &channels.concat()),
+    ));
+    node(
+        p3d::MAGIC,
+        &[],
+        &node(0x121000, clip.payload(template), &children),
+    )
+}
+fn scale_channel(id: u32) -> Vec<u8> {
+    let mut payload = 0u32.to_le_bytes().to_vec();
+    payload.extend(b"SCL\0");
+    if matches!(id, 0x121102 | 0x121103 | 0x121118) {
+        payload.extend(0u16.to_le_bytes()); // X is authored for scalar, constant for 2D.
+        for value in [1f32, 1., 1.] {
+            payload.extend(value.to_le_bytes());
+        }
+    }
+    payload.extend(2u32.to_le_bytes());
+    for frame in [0u16, 10] {
+        payload.extend(frame.to_le_bytes());
+    }
+    match id {
+        0x121119 => {
+            for bits in [0x3c00u16, 0x3c00, 0x3c00, 0x4200, 0x3c00, 0x3c00] {
+                payload.extend(bits.to_le_bytes());
+            }
+        }
+        0x121104 => {
+            for value in [1f32, 1., 1., 3., 1., 1.] {
+                payload.extend(value.to_le_bytes());
+            }
+        }
+        0x121102 => {
+            for value in [1f32, 3.] {
+                payload.extend(value.to_le_bytes());
+            }
+        }
+        0x121118 => {
+            for bits in [0x3c00u16, 0x3c00, 0x4200, 0x4500] {
+                payload.extend(bits.to_le_bytes());
+            }
+        }
+        0x121103 => {
+            for value in [1f32, 1., 3., 5.] {
+                payload.extend(value.to_le_bytes());
+            }
+        }
+        _ => unreachable!(),
+    }
+    node(id, &payload, &[])
+}
+#[test]
+fn authored_scale_changes_the_rotating_skin_and_absence_keeps_bind_scale() {
+    let template = fixture(false);
+    let chunks = p3d::parse(&template).unwrap();
+    let rotation = chunks.iter().find(|n| n.id == 0x121112).unwrap();
+    let rotation = template[rotation.offset..rotation.offset + rotation.total_size].to_vec();
+    let rig = skeleton();
+    let skin = SkinMesh {
+        name: "tip".into(),
+        skeleton: "synthetic".into(),
+        positions: vec![[2., 0., 0.]],
+        normals: vec![[1., 0., 0.]],
+        weights: vec![[1., 0., 0., 0.]],
+        joints: vec![[1; 4]],
+        indices: vec![],
+    };
+    for id in [0x121119, 0x121104, 0x121102, 0x121118, 0x121103] {
+        let data = clip_with_channels(&template, &[rotation.clone(), scale_channel(id)]);
+        let clip = animation::load_clip(&data, &p3d::parse(&data).unwrap(), "synthetic").unwrap();
+        let expected_scale = if matches!(id, 0x121118 | 0x121103) {
+            Vec3::new(1., 2., 3.)
+        } else {
+            Vec3::new(2., 1., 1.)
+        };
+        assert_eq!(
+            clip.sample_local(&rig, 5.).unwrap()[1].scale,
+            expected_scale
+        );
+        let pose = skin.deform(&rig, &clip.sample(&rig, 5.).unwrap()).unwrap();
+        assert!(
+            (Vec3::from_array(pose.positions[0]) - Vec3::new(1., expected_scale.x, 0.)).length()
+                < 1e-5
+        );
+        assert_eq!(clip.sample_local(&rig, -10.).unwrap()[1].scale, Vec3::ONE);
+        let mut bad = clip.clone();
+        bad.tracks
+            .get_mut("tip")
+            .unwrap()
+            .scale
+            .as_mut()
+            .unwrap()
+            .values[0]
+            .x = f32::NAN;
+        assert!(bad.sample(&rig, 5.).is_err());
+    }
+    let mut scaled_rig = rig;
+    scaled_rig.joints[1].bind_local =
+        Mat4::from_scale_rotation_translation(Vec3::new(4., 5., 6.), glam::Quat::IDENTITY, Vec3::X);
+    let clip = animation::load_clip(&template, &chunks, "synthetic").unwrap();
+    assert_eq!(
+        clip.sample_local(&scaled_rig, 5.).unwrap()[1].scale,
+        Vec3::new(4., 5., 6.)
+    );
+    assert!(clip.tracks["tip"].sample(5.).unwrap().scale.is_none());
+}
+#[test]
+fn scale_encoding_rejects_duplicates_nonfinite_axes_versions_and_truncation() {
+    let template = fixture(false);
+    let channel = scale_channel(0x121119);
+    let data = clip_with_channels(&template, &[channel.clone(), channel.clone()]);
+    assert!(animation::load_clip(&data, &p3d::parse(&data).unwrap(), "synthetic").is_err());
+    for (id, relative, bytes) in [
+        (0x121119, 0, 1u32.to_le_bytes().to_vec()),
+        (0x121119, 16, 0x7c00u16.to_le_bytes().to_vec()),
+        (0x121102, 8, 3u16.to_le_bytes().to_vec()),
+        (0x121118, 8, 3u16.to_le_bytes().to_vec()),
+        (0x121104, 16, f32::INFINITY.to_le_bytes().to_vec()),
+    ] {
+        let mut channel = scale_channel(id);
+        channel[12 + relative..12 + relative + bytes.len()].copy_from_slice(&bytes);
+        let data = clip_with_channels(&template, &[channel]);
+        assert!(animation::load_clip(&data, &p3d::parse(&data).unwrap(), "synthetic").is_err());
+    }
+    let data = clip_with_channels(&template, &[channel]);
+    let chunks = p3d::parse(&data).unwrap();
+    let index = chunks.iter().position(|n| n.id == 0x121119).unwrap();
+    for len in 0..chunks[index].data_size - 12 {
+        let mut short = chunks.clone();
+        short[index].data_size = 12 + len;
+        assert!(animation::load_clip(&data, &short, "synthetic").is_err());
+    }
+}
+#[test]
+fn disabled_channel_metadata_preserves_keys_and_rejects_unimplemented_flags() {
+    for referenced in [false, true] {
+        let template = fixture(referenced);
+        let chunks = p3d::parse(&template).unwrap();
+        let channel = chunks.iter().find(|n| n.id == 0x121112).unwrap();
+        let original_children =
+            &template[channel.offset + channel.data_size..channel.offset + channel.total_size];
+        let with_metadata = |metadata: &[u8]| {
+            let children = [original_children, metadata].concat();
+            clip_with_channels(
+                &template,
+                &[node(0x121112, channel.payload(&template), &children)],
+            )
+        };
+        let empty = node(0x121110, &[0; 8], &[]);
+        let data = with_metadata(&empty);
+        let clip = animation::load_clip(&data, &p3d::parse(&data).unwrap(), "synthetic").unwrap();
+        assert!(
+            (clip.sample(&skeleton(), 5.).unwrap()[1].transform_vector3(Vec3::X) - Vec3::Y)
+                .length()
+                < 1e-5
+        );
+        let mut invalid = vec![
+            node(0x121110, &[1, 0, 0, 0, 0, 0, 0, 0], &[]),
+            node(0x121110, &[0, 0, 0, 0, 1, 0, 0, 0], &[]),
+            node(0x121110, &[0; 8], &node(0x121101, &[0; 8], &[])),
+            [empty.clone(), empty].concat(),
+        ];
+        for len in (0..8).chain([9]) {
+            invalid.push(node(0x121110, &vec![0; len], &[]));
+        }
+        for metadata in invalid {
+            let data = with_metadata(&metadata);
+            assert!(animation::load_clip(&data, &p3d::parse(&data).unwrap(), "synthetic").is_err());
+        }
+    }
+}
 #[test]
 fn sync_frame_child_is_checked_and_absence_uses_native_zero_default() {
     let data = fixture(false);

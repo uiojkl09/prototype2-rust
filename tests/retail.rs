@@ -3,6 +3,73 @@ use prototype2_rust::{capsule, collision, fight, meta, p3d, rcf::Archive, scene}
 
 #[test]
 #[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
+fn installed_skeletal_corpus_samples_with_authored_scale_and_disabled_metadata() {
+    use prototype2_rust::animation;
+    let game = std::path::PathBuf::from(std::env::var_os("PROTOTYPE2_GAME").unwrap());
+    let boot = Archive::open(game.join("boot.rcf")).unwrap();
+    let data = p3d::decode(
+        &boot
+            .read(boot.find("art\\alex\\alex.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let chunks = p3d::parse(&data).unwrap();
+    let infos = animation::clips(&data, &chunks).unwrap();
+    let skeletons = ["alex_reg_body_skeleton", "alex_reg_arms_skeleton"]
+        .map(|name| animation::skeleton(&data, &chunks, name).unwrap());
+    assert_eq!(infos.iter().filter(|c| c.kind == *b"CAM\0").count(), 166);
+    assert_eq!(infos.iter().filter(|c| c.kind == *b"EXP\0").count(), 24);
+    let mut skeletal = 0;
+    let mut scale_clips = 0;
+    let mut scale_channels = 0;
+    for info in &infos {
+        if info.kind != *b"PTRN" {
+            assert!(animation::load_clip(&data, &chunks, &info.name).is_err());
+            continue;
+        }
+        let clip = animation::load_clip(&data, &chunks, &info.name)
+            .unwrap_or_else(|error| panic!("{} at 0x{:x}: {error:#}", info.name, info.offset));
+        skeletal += 1;
+        let count = clip.tracks.values().filter(|t| t.scale.is_some()).count();
+        scale_clips += usize::from(count > 0);
+        scale_channels += count;
+        for frame in [0., info.last_frame() * 0.5, info.last_frame()] {
+            // Validate every authored track, including ones outside the selected Heller rigs.
+            for track in clip.tracks.values() {
+                track.sample(frame).unwrap();
+            }
+            for skeleton in &skeletons {
+                assert!(
+                    clip.sample(skeleton, frame)
+                        .unwrap()
+                        .iter()
+                        .all(|m| m.is_finite())
+                );
+            }
+        }
+    }
+    assert_eq!((skeletal, scale_clips, scale_channels), (741, 35, 580));
+    let shield = animation::load_clip(&data, &chunks, "heller_shield_brace2idle").unwrap();
+    assert_eq!(shield.info.offset, 0x7bd7f4);
+    let scale = shield.tracks["Index_L"].scale.as_ref().unwrap();
+    assert_eq!(scale.frames.len(), 1);
+    assert_eq!(scale.values[0].to_array(), [0.010002136; 3]);
+    let index = skeletons[0]
+        .joints
+        .iter()
+        .position(|j| j.name == "Index_L")
+        .unwrap();
+    assert_eq!(
+        shield.sample_local(&skeletons[0], 7.5).unwrap()[index].scale,
+        scale.values[0]
+    );
+    println!(
+        "741 PTRN clips sampled; 580 scale channels across 35 clips; 166 CAM and 24 EXP explicitly excluded. Sampling on Heller rigs does not prove clip/actor compatibility or graph reachability."
+    );
+}
+
+#[test]
+#[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
 fn installed_heller_fixups_bind_and_deform_selected_original_poses() {
     use prototype2_rust::{animation, pose_fixup, skin};
     let game = std::path::PathBuf::from(std::env::var_os("PROTOTYPE2_GAME").unwrap());
@@ -61,6 +128,11 @@ fn installed_heller_fixups_bind_and_deform_selected_original_poses() {
         ("heller_loco_run_n", 10.5),
         ("heller_loco_run_sprint_n", 8.),
         ("heller_loco_jump_from_idle", 50.),
+        ("heller_bare_punch_1", 30.),
+        ("heller_bare_kick_1", 30.),
+        ("heller_power_act_blade_V1", 60.),
+        ("heller_devastator_attack", 90.),
+        ("heller_shield_brace2idle", 7.5),
     ] {
         let clip = animation::load_clip(&data, &chunks, name).unwrap();
         for skeleton in &skeletons {

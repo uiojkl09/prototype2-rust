@@ -12,9 +12,10 @@ Animation integration takes priority over textures.
 .\prototype2-rust.exe animate --game 'F:\SteamLibrary\steamapps\common\Prototype 2'
 ```
 
-The default clip is `heller_loco_run_n`. Five validated clips are loaded: run,
+The default clip is `heller_loco_run_n`. Seven validated clips are loaded: run,
 idle (`alex_amb_stand`), walk (`heller_loco_walk_n`), sprint
-(`heller_loco_run_sprint_n`) and jump (`heller_loco_jump_from_idle`). A/B select
+(`heller_loco_run_sprint_n`), jump (`heller_loco_jump_from_idle`), bare punch
+(`heller_bare_punch_1`) and bare kick (`heller_bare_kick_1`). A/B select
 the next/previous clip. Right stick or left-stick X orbit; left-stick Y zooms.
 X pauses, Y restarts, LB slows playback and Menu exits. Focus loss suppresses
 input; connection/focus changes do not create button edges. These are inspection
@@ -61,6 +62,18 @@ the referenced animations and constructs/reuses a locomotion driver; its phase,
 sync and update policies beyond the standalone subset below still require recovery
 before implementing transitions.
 
+The complete header inventory is **741 PTRN skeletal patterns, 166 CAM camera
+patterns and 24 EXP expression patterns**. All 741 skeletal patterns now decode;
+every authored track and both selected rigs were sampled at frame zero, midpoint
+and last frame. Some patterns belong to other actors/props and share few or no
+joint names. This check establishes reader/sampler coverage, not correct actor
+binding, gameplay reachability or camera/expression playback.
+
+Bare punch and kick chunks are **0x6a361b / 0x68d6a9**, last frames 88 / 125.
+Blade activation is **0x7a62bf**, last frame 192; devastator attack is **0x6c8989**,
+last frame 200. These can be inspected independently of the action scheduler;
+weapon/power drawables are not assembled in this character preview.
+
 `art.rcf / art\alex\alex_model_main.p3d` supplies selected body/arm geometry.
 Nine supported skin primitives contain **7,978 vertices / 12,463 triangles**.
 Body and arm skeletons are joined by exact drawable references; a separate
@@ -78,9 +91,10 @@ left-arm skeleton/drawable is not selected. This is not complete model assembly.
 | 0x121010 | Version 0 block table, inspected 8192 marker, checked cumulative block sizes covering the blob |
 | 0x121121 | Version 0 referenced key count, offset and block index; frames followed by values aligned to four-byte absolute blob position |
 | 0x121112 / 0x121114 | ROT v1 signed i16/i8 XYZ, reconstructed positive W |
-| 0x121104 / 0x121119 | TRAN v0 float3 / IEEE binary16 triple |
-| 0x121102 | TRAN v0 scalar replacing one component of a supplied base vector |
-| 0x121103 / 0x121118 | TRAN v0 float2 / binary16 pair replacing the other two components |
+| 0x121104 / 0x121119 | TRAN or SCL v0 float3 / IEEE binary16 triple |
+| 0x121102 | TRAN or SCL v0 scalar replacing one component of a supplied base vector |
+| 0x121103 / 0x121118 | TRAN or SCL v0 float2 / binary16 pair replacing the other two components |
+| 0x121110 | Inspected disabled channel metadata: v0, zero flag, exactly eight bytes and no children; active/nested metadata remains unsupported |
 | 0x25000 / 0x25001 / 0x25002 | Drawable/skeleton, primitive and named shader/index/vertex/skin references |
 
 Inline key arrays have no referenced-blob alignment padding. Key frame indices
@@ -98,7 +112,26 @@ corroborated by unpackers **0x1080e2b0 / 0x1080e3f0**. W uses the square root of
 the nonnegative clamped remainder. XYZ/W ordering is corroborated by matrix
 conversion **0x107e9790**; older format documentation alone was insufficient.
 The two-component axis table at **0x10d91690** selects (Y,Z), (X,Z), (X,Y).
-Half expansion is corroborated by **0x10845370 / 0x1080eab0**.
+Half expansion is corroborated by **0x10845370 / 0x1080eab0**. The vector reader
+**0x10843620** retains the channel kind, so these layouts also carry `SCL\0`.
+Native ordinary pose blending **0x1062f600** routes both translation and scale
+through the linear component blend **0x1062dfe0**.
+
+v0.1.6 and earlier skipped authored scale channels. v0.1.7 decodes and samples
+them, retains bind scale only when an authored channel is absent, and includes
+scale in local pose blending before parent composition. The corpus contains 580
+scale channels across 35 skeletal clips: 540 half3, 37 scalar and three half2.
+For example, `heller_shield_brace2idle` at **0x7bd7f4** supplies constant scale
+**0.01000213623046875** on `Index_L` and other hand/arm joints. Shrinking those
+joints is authored behavior; missing shield/weapon assembly is a separate limit.
+Hammerfist acquisition also carries scale tracks on power-specific joints outside
+the two selected base rigs. Such channels are decoded but cannot deform absent rigs.
+
+Five skeletal clips previously failed on direct child **0x121110**. Its inspected
+v0/zero-flag form leaves native channel flag bit 0x40 clear, as corroborated by
+**0x108421a0**; it does not replace or erase the referenced keys. This empty form
+is accepted with strict size/version/flag/child/uniqueness checks. Active flags,
+nested values and channel-name overrides remain unimplemented and fail.
 
 Skin streams use inspected 80-byte records: float4 positions/normals/weights and
 u16x4 joint indices. Both position and normal fourth lanes are **1** in these
@@ -108,10 +141,11 @@ Bind-pose deformation reproduces input positions within 0.0001 units.
 ## Sampling and visible limits
 
 The core samples an explicit finite frame, clamps outside individual key ranges,
-linearly interpolates translation and uses normalized shortest-arc quaternion
+linearly interpolates translation/scale and uses normalized shortest-arc quaternion
 SLERP. Missing tracks preserve bind transforms. Parent composition produces joint
 world matrices; CPU skinning uses `sampled_world * inverse_bind_world`. Synthetic
-two-joint fixtures independently verify a known halfway rotation and deformed point.
+two-joint fixtures independently verify a known halfway rotation, nonuniform scale
+and deformed point; a child position verifies scale blending before composition.
 The native interpolator uses approximations different from glam: bitwise matching
 and full blending behavior have not been demonstrated.
 
@@ -271,7 +305,7 @@ different-parent rigs. It does not invent descendant propagation. Singular/nonfi
 poses, stale bindings and overflow fail. Synthetic fixtures verify copy/hierarchy,
 both collar directions, upper-limit and negative-offset behavior, rotated chin
 offsets, translation reset/orientation preservation and malformed layouts.
-An installed-data test evaluates six clips on both selected skeletons and deforms
+An installed-data test evaluates eleven clips on both selected skeletons and deforms
 all nine skins. Exact power/inverse/SIMD rounding parity is unproven.
 
 A same-frame run capture at 10.5 was visually compared with the earlier capture:
@@ -281,11 +315,12 @@ These two strategies do not complete the model or establish retail appearance.
 Materials are diagnostic colors. Morph/cloth/expression assembly, additional constraints,
 retail shaders, motion events, transitions, layered blends, grounded movement and
 camera behavior remain unresolved. Some shoulder/hood geometry visibly overlaps.
-Selected clips passing does not establish support for all 931 headers.
+Camera/expression patterns and their consumers remain unsupported.
 
-Default playback contains five clips; choosing an additional supported clip adds
-it to the inspection bank. Six clips have now been sampled successfully, including
-both idle references. This does not prove the main bare branch's retail reachability.
+Default playback contains seven clips; choosing an additional supported clip adds
+it to the inspection bank. Eleven selected clips also pass fixup/skin evaluation.
+The full skeletal corpus passes reader/sampling checks. Neither check proves the
+main bare branch's retail reachability or complete model/power assembly.
 
 Run frame 0 and 10.5 captures showed distinct deformed poses. A continuous walk
 capture reached frame 14.959668, demonstrating advancement rather than a static
@@ -295,6 +330,11 @@ inspected, with distinct standing/running/airborne poses and unresolved cloth pa
 The corrected v0.1.4 continuous walk capture reached frame 15.784990 and the actual
 window controls passed again after the loop interval correction.
 The owner has not physically tested the new animation-specific mapping.
+v0.1.7 additionally captured punch frames 0 / 30, kick 30, blade activation 60,
+shield transition 7.5 and continuous punch at frame 15.751035. Distinct poses were
+visually inspected; shoulder/hood overlap and missing weapon meshes remain visible.
+Actual-window automation exercised the seven-clip bank, including punch/kick and
+wrap in both directions, alongside pause/reset/blend-mode behavior and exit.
 Automated keyboard scan-code input in the actual focused viewer verified next and
 previous clips, a stable paused frame, reset to frame zero and successful exit.
 That test does not simulate or establish physical Xbox input.

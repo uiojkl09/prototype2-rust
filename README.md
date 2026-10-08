@@ -7,7 +7,7 @@ Heller skeleton/skin animation playback.
 **This release is an investigation milestone, not a playable game.** It loads real
 merged geometry from `yellow_zone/Cell_29`, shows it without textures, and can display
 recovered ground-collision triangles. Free-camera controls do not implement Heller's
-movement. Five original character clips now play in a separate inspection mode.
+movement. Seven original character clips now play in a separate inspection mode.
 Gameplay animation transitions, missions, powers, combat, AI, audio and progression
 are absent.
 
@@ -26,13 +26,17 @@ writable directory, and open PowerShell there:
 ```
 
 **Animation Xbox controls:** A/B change clips, sticks orbit/zoom, X pause, Y restart,
-LB slow playback and Menu exit. Run, idle, walk, sprint and jump are available.
+LB slow playback and Menu exit. Run, idle, walk, sprint, jump, bare punch and bare
+kick are available.
 **RB toggles locomotion blending:** left-stick magnitude varies idle/walk/run
 weights and shared stride timing; right stick orbits. The character stays in place.
 See [animation evidence and limits](docs/ANIMATION.md). Textures remain deferred
 while animation/state integration takes priority.
 The installed Heller collar/shoulder corrective poses are applied before skinning;
 complete model/cloth assembly remains unresolved.
+Authored scale channels now participate in poses and blending. All 741 skeletal
+clips in the inspected character package decode and sample; this does not establish
+compatibility with every actor or execute their gameplay actions.
 
 Use `view --game <directory>` for the world section. **World viewer Xbox controls:**
 left stick to move, right stick to look, A/B to rise/descend,

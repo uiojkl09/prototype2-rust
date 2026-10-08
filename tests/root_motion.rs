@@ -16,6 +16,7 @@ fn interval(previous: f32, current: f32) -> Interval {
 }
 fn moving() -> JointTrack {
     JointTrack {
+        scale: None,
         rotation: None,
         translation: Some(Keys {
             frames: vec![0, 10],
@@ -149,6 +150,7 @@ fn absence_and_invalid_endpoints_keys_and_overflow_are_explicit() {
     malformed.translation.as_mut().unwrap().frames.clear();
     assert!(delta(Some(&malformed), interval(0., 10.)).is_err());
     let extreme = JointTrack {
+        scale: None,
         rotation: None,
         translation: Some(Keys {
             frames: vec![0, 10],

@@ -27,9 +27,10 @@ format/research/validation notes; do not repeat the archive investigation.
   records; selected LocoSteer/capsule tracks decoded with native corroboration.
 - Isolated LocoSteer target-speed, acceleration and turning rules in Rust; single
   capsule-action capture/interpolation/restore. These do not yet form gameplay.
-- Original skeleton/packed rotation/translation readers, compressed key blocks and
-  checked skin references. Nine Heller skin meshes deform using original clips.
-- `animate` plays run, idle, walk, sprint and jump; Xbox A/B select clips, X pauses,
+- Original skeleton/packed rotation/translation/scale readers, compressed key blocks
+  and checked skin references. Nine Heller skin meshes deform using original clips.
+- `animate` plays run, idle, walk, sprint, jump, bare punch and bare kick;
+  Xbox A/B select clips, X pauses,
   Y restarts, sticks orbit/zoom and Menu exits. Fixed-pose GPU captures and continuous
   playback verified. Animation-specific physical controls have not been owner-tested.
 - Native frame-count-minus-one timing and an isolated three-stage locomotion phase
@@ -42,9 +43,16 @@ format/research/validation notes; do not repeat the archive investigation.
   reports explicit frame endpoints; five real root tracks measured in both spaces.
   This is authored clip motion, with no actor/contact integration or scheduler.
 - Heller's installed collar/shoulder pose-fixup configuration now updates corrective
-  joints before skinning in single-clip and blended previews. Six clips on both
+  joints before skinning in single-clip and blended previews. Eleven clips on both
   skeletons tested; visual overlap still remains. Broader state/rig policies are
   unsupported, documented in ANIMATION.md.
+- Wider character-package coverage: all 741 skeletal patterns decode and sample,
+  including 580 authored scale channels across 35 clips and five clips with disabled
+  channel metadata. Camera/expression patterns remain unsupported. Compatible actor
+  rigs and graph reachability are not established by sampling on the Heller rigs.
+- Bare punch/kick, blade activation and shield fixed-pose captures were inspected;
+  continuous punch playback advances. Weapon meshes and complete power/model/cloth
+  assembly remain incomplete. Controller-bank switching passed actual-window automation.
 
 ## Incomplete / unknown
 

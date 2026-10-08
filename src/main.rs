@@ -282,11 +282,12 @@ fn run() -> Result<()> {
                 "ANIMATION_REFERENCES: main LocoSteer 0x{:x}: idle/walk/run {:?}; state scheduling is not executed",
                 record.offset, names
             );
-            for name in names
-                .iter()
-                .copied()
-                .chain(["heller_loco_run_sprint_n", "heller_loco_jump_from_idle"])
-            {
+            for name in names.iter().copied().chain([
+                "heller_loco_run_sprint_n",
+                "heller_loco_jump_from_idle",
+                "heller_bare_punch_1",
+                "heller_bare_kick_1",
+            ]) {
                 if name != clip_name {
                     clips.push(animation::load_clip(&data, &chunks, name)?);
                 }

@@ -244,11 +244,28 @@ impl<T> Keys<T> {
 pub struct JointTrack {
     pub rotation: Option<Keys<Quat>>,
     pub translation: Option<Keys<Vec3>>,
+    pub scale: Option<Keys<Vec3>>,
 }
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TrackSample {
     pub rotation: Option<Quat>,
     pub translation: Option<Vec3>,
+    pub scale: Option<Vec3>,
+}
+fn sample_vector(keys: &Keys<Vec3>, frame: f32) -> Result<Vec3> {
+    keys.validate()?;
+    ensure!(
+        keys.values.iter().all(|v| v.is_finite()),
+        "invalid vector keys"
+    );
+    let (a, b, t) = keys.interval(frame);
+    let value = if a == b || t == 0. {
+        keys.values[a]
+    } else {
+        keys.values[a].lerp(keys.values[b], t)
+    };
+    ensure!(value.is_finite(), "animation vector interpolation overflow");
+    Ok(value)
 }
 impl JointTrack {
     /// Sample authored channels only. Absence remains distinct from bind fallback.
@@ -276,19 +293,12 @@ impl JointTrack {
         let translation = self
             .translation
             .as_ref()
-            .map(|keys| -> Result<Vec3> {
-                keys.validate()?;
-                ensure!(
-                    keys.values.iter().all(|v| v.is_finite()),
-                    "invalid translation keys"
-                );
-                let (a, b, t) = keys.interval(frame);
-                Ok(if a == b || t == 0. {
-                    keys.values[a]
-                } else {
-                    keys.values[a].lerp(keys.values[b], t)
-                })
-            })
+            .map(|keys| sample_vector(keys, frame))
+            .transpose()?;
+        let scale = self
+            .scale
+            .as_ref()
+            .map(|keys| sample_vector(keys, frame))
             .transpose()?;
         ensure!(
             rotation.is_none_or(|q| q.is_finite()) && translation.is_none_or(|p| p.is_finite()),
@@ -297,6 +307,7 @@ impl JointTrack {
         Ok(TrackSample {
             rotation,
             translation,
+            scale,
         })
     }
 }
@@ -331,12 +342,13 @@ impl Clip {
         ensure!(frame.is_finite(), "non-finite animation frame");
         let mut local = Vec::with_capacity(skeleton.joints.len());
         for joint in &skeleton.joints {
-            let (scale, mut rotation, mut translation) =
+            let (mut scale, mut rotation, mut translation) =
                 joint.bind_local.to_scale_rotation_translation();
             if let Some(track) = self.tracks.get(&joint.name) {
                 let sample = track.sample(frame)?;
                 rotation = sample.rotation.unwrap_or(rotation);
                 translation = sample.translation.unwrap_or(translation);
+                scale = sample.scale.unwrap_or(scale);
             }
             local.push(LocalTransform {
                 scale,
@@ -453,7 +465,7 @@ pub fn load_clip(data: &[u8], chunks: &[Chunk], wanted: &str) -> Result<Clip> {
             let mut c = Cursor::new(channel.payload(data));
             let version = c.u32()?;
             let kind = c.take(4)?;
-            if kind != b"ROT\0" && kind != b"TRAN" {
+            if kind != b"ROT\0" && kind != b"TRAN" && kind != b"SCL\0" {
                 continue;
             }
             let axis = if matches!(channel.id, 0x121102 | 0x121103 | 0x121118) {
@@ -468,7 +480,25 @@ pub fn load_clip(data: &[u8], chunks: &[Chunk], wanted: &str) -> Result<Clip> {
             };
             let count = c.u32()? as usize;
             let mut reference = None;
+            let mut metadata = false;
             for &child in tree.get(&j).map(Vec::as_slice).unwrap_or(&[]) {
+                if chunks[child].id == 0x121110 {
+                    // The inspected disabled form leaves native flag bit 0x40 clear.
+                    // It is metadata alongside the keys, not an empty key array.
+                    ensure!(!metadata, "duplicate animation channel metadata");
+                    let mut r = Cursor::new(chunks[child].payload(data));
+                    ensure!(
+                        r.u32()? == 0 && r.u32()? == 0,
+                        "unsupported animation channel metadata"
+                    );
+                    complete(&r)?;
+                    ensure!(
+                        !tree.contains_key(&child),
+                        "nonempty animation channel metadata"
+                    );
+                    metadata = true;
+                    continue;
+                }
                 ensure!(
                     chunks[child].id == 0x121121,
                     "unsupported animation channel child"
@@ -551,11 +581,13 @@ pub fn load_clip(data: &[u8], chunks: &[Chunk], wanted: &str) -> Result<Clip> {
                 }
                 track.rotation = Some(Keys { frames, values });
             } else {
-                ensure!(version == 0, "unsupported translation version");
-                ensure!(
-                    track.translation.is_none(),
-                    "duplicate joint translation channel"
-                );
+                ensure!(version == 0, "unsupported vector channel version");
+                let target = if kind == b"TRAN" {
+                    &mut track.translation
+                } else {
+                    &mut track.scale
+                };
+                ensure!(target.is_none(), "duplicate joint vector channel");
                 let mut values = Vec::with_capacity(keys.0);
                 for _ in 0..keys.0 {
                     let v = match channel.id {
@@ -566,9 +598,9 @@ pub fn load_clip(data: &[u8], chunks: &[Chunk], wanted: &str) -> Result<Clip> {
                             half(keys.1.u16()?),
                         ],
                         0x121103 | 0x121118 => {
-                            let axis = axis.context("missing translation constant axis")?;
-                            ensure!(axis < 3, "invalid translation constant axis");
-                            let mut v = base.context("missing translation base")?;
+                            let axis = axis.context("missing vector constant axis")?;
+                            ensure!(axis < 3, "invalid vector constant axis");
+                            let mut v = base.context("missing vector base")?;
                             let components = [[1, 2], [0, 2], [0, 1]][axis];
                             for i in components {
                                 v[i] = if channel.id == 0x121118 {
@@ -580,24 +612,23 @@ pub fn load_clip(data: &[u8], chunks: &[Chunk], wanted: &str) -> Result<Clip> {
                             v
                         }
                         0x121102 => {
-                            let axis = axis.context("missing translation axis")?;
-                            ensure!(axis < 3, "invalid translation axis");
-                            let mut v = base.context("missing translation base")?;
+                            let axis = axis.context("missing vector axis")?;
+                            ensure!(axis < 3, "invalid vector axis");
+                            let mut v = base.context("missing vector base")?;
                             v[axis] = keys.1.f32()?;
                             v
                         }
-                        _ => anyhow::bail!(
-                            "unsupported translation channel 0x{:x} in {name}",
-                            channel.id
-                        ),
+                        _ => {
+                            anyhow::bail!("unsupported vector channel 0x{:x} in {name}", channel.id)
+                        }
                     };
                     ensure!(
                         v.iter().all(|v| v.is_finite()),
-                        "non-finite animation translation"
+                        "non-finite animation vector"
                     );
                     values.push(Vec3::from_array(v));
                 }
-                track.translation = Some(Keys { frames, values });
+                *target = Some(Keys { frames, values });
             }
             if keys.2.is_none() {
                 complete(&keys.1)?;

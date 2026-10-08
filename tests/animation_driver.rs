@@ -40,6 +40,7 @@ fn clip(name: &str, rotation: Quat, translation: Vec3) -> Clip {
         tracks: HashMap::from([(
             "root".into(),
             JointTrack {
+                scale: None,
                 rotation: Some(Keys {
                     frames: vec![0],
                     values: vec![rotation],
@@ -124,6 +125,25 @@ fn locomotion_blends_local_components_before_parent_composition() {
     assert!(clips[0].sample(&overflow, 0.).is_err());
 }
 
+#[test]
+fn locomotion_blends_authored_scale_before_composing_child_positions() {
+    let rig = rig();
+    let idle = clip("idle", Quat::IDENTITY, Vec3::ZERO);
+    let mut walk = clip("walk", Quat::IDENTITY, Vec3::ZERO);
+    let mut run = clip("run", Quat::IDENTITY, Vec3::ZERO);
+    walk.tracks.get_mut("root").unwrap().scale = Some(Keys {
+        frames: vec![0],
+        values: vec![Vec3::new(2., 1., 1.)],
+    });
+    run.tracks.get_mut("root").unwrap().scale = Some(Keys {
+        frames: vec![0],
+        values: vec![Vec3::new(4., 1., 1.)],
+    });
+    let pose = sample_locomotion(&rig, [&idle, &walk, &run], 0.4, [0., 0.5, 0.5], [0.; 3]).unwrap();
+    assert_eq!(pose[1].transform_point3(Vec3::ZERO), Vec3::new(3., 0., 0.));
+    let pose = sample_locomotion(&rig, [&idle, &walk, &run], 0.4, [0.5, 0.5, 0.], [0.; 3]).unwrap();
+    assert_eq!(pose[1].transform_point3(Vec3::ZERO), Vec3::new(1.5, 0., 0.));
+}
 #[test]
 fn pose_blend_respects_antipodal_rotations_and_native_zero_dot_hemisphere() {
     let rig = rig();
