@@ -77,11 +77,16 @@ distributed LICENSE/COPYING/NOTICE files, including nested font/asset notices, i
 `dependency-licenses/` beside the binary and records SPDX metadata in inventory.json.
 That directory includes the resolved Windows graph and build-only dependencies
 conservatively; other-platform-only crates are not distributed in this binary.
-Generated
-notices are outside this source repository and contain no game assets.
+Generated notices are outside this source repository and contain no game assets.
 When a published crate omits notice files, the packager retrieves its upstream
 notices at the exact Git revision recorded in .cargo_vcs_info.json. Source URLs
-are retained in the inventory; missing notices fail packaging.
+and hashes are retained in the inventory; missing notices fail packaging.
+Two inspected releases contain no upstream license files: constgebra 0.1.4 declares
+MIT OR Apache-2.0, and hexf-parse 0.2.1 declares CC0-1.0. For those exact revisions,
+the package preserves Cargo.toml.orig's license declaration and supplies the standard
+Apache-2.0 or CC0-1.0 text from SPDX license-list-data v3.28.0. The explicit exceptions
+fail if version, recorded revision or declared license changes; they are not a
+generic fallback for unknown licenses. Source URLs and hashes identify these texts.
 
 Original game data, proprietary binaries and trademarks are not covered by the
 project's MIT license. Players supply their own installation.
