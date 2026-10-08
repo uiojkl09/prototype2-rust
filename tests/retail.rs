@@ -3,6 +3,70 @@ use prototype2_rust::{capsule, collision, fight, meta, p3d, rcf::Archive, scene}
 
 #[test]
 #[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
+fn installed_root_tracks_extract_measured_clip_motion_in_both_spaces() {
+    use prototype2_rust::{
+        animation,
+        root_motion::{self, Interval},
+    };
+    let game = std::path::PathBuf::from(std::env::var_os("PROTOTYPE2_GAME").unwrap());
+    let boot = Archive::open(game.join("boot.rcf")).unwrap();
+    let data = p3d::decode(
+        &boot
+            .read(boot.find("art\\alex\\alex.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let chunks = p3d::parse(&data).unwrap();
+    for (name, raw, relative) in [
+        ("alex_amb_stand", [0.; 3], [0.; 3]),
+        ("heller_loco_walk_n", [0., 0., -1.66], [0., 0., -1.66]),
+        (
+            "heller_loco_run_n",
+            [0., 0., 3.9757304],
+            [0., 0., -3.9757304],
+        ),
+        (
+            "heller_loco_run_sprint_n",
+            [0., 0., -4.999793],
+            [0., 0., -4.999793],
+        ),
+        (
+            "heller_loco_jump_from_idle",
+            [0.061584473, 1.0410156, -1.6240234],
+            [0.061584473, 1.0410156, -1.6240234],
+        ),
+    ] {
+        let clip = animation::load_clip(&data, &chunks, name).unwrap();
+        let track = clip.tracks.get("Motion_Root").unwrap();
+        for (relative_translation, expected) in [(false, raw), (true, relative)] {
+            let motion = root_motion::delta(
+                Some(track),
+                Interval {
+                    previous: 0.,
+                    current: clip.info.last_frame(),
+                    first: 0.,
+                    last: clip.info.last_frame(),
+                    relative_translation,
+                    reverse: false,
+                },
+            )
+            .unwrap();
+            assert!(
+                motion
+                    .translation
+                    .to_array()
+                    .iter()
+                    .zip(expected)
+                    .all(|(a, b)| (*a - b).abs() < 1e-5),
+                "unexpected root displacement for {name}"
+            );
+            assert!((motion.rotation - glam::Quat::IDENTITY).length() < 1e-5);
+        }
+    }
+}
+
+#[test]
+#[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
 fn installed_character_skeletons_and_skin_bind_pose_agree() {
     use prototype2_rust::{animation, skin};
     let game = std::path::PathBuf::from(std::env::var_os("PROTOTYPE2_GAME").unwrap());

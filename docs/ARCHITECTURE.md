@@ -51,6 +51,8 @@ recovered scalar/shape rules. They do not supply a scheduler or game simulation.
 character assets. `animation_driver` supplies native three-stage phase and local
 pose-blend rules with explicit seconds. Action selection, partitions and layering
 remain separate; native quaternion approximation parity has not been established.
+`root_motion` extracts authored single-clip deltas with explicit endpoints and
+flags, independently of skeleton bind fallback and actor/contact integration.
 `animation_viewer` is a separate adapter with an inspection clock
 and root-neutral preview policy; it must not become the retail movement contract.
 See FIGHT.md and ANIMATION.md for evidence and remaining behaviors.

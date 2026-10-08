@@ -12,5 +12,6 @@ pub mod locomotion;
 pub mod meta;
 pub mod p3d;
 pub mod rcf;
+pub mod root_motion;
 pub mod scene;
 pub mod skin;

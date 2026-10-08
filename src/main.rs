@@ -52,7 +52,11 @@ fn run() -> Result<()> {
                 "--invert-y",
                 "--clip",
                 "--sample-frame",
-                "--loco-speed"
+                "--loco-speed",
+                "--previous-frame",
+                "--current-frame",
+                "--relative-root",
+                "--reverse"
             ]
             .contains(&key.as_str()),
             "unknown option {key}"
@@ -75,6 +79,14 @@ fn run() -> Result<()> {
         "meta" => &["--game", "--archive", "--entry", "--filter", "--limit"],
         "fight" => &["--game", "--archive", "--entry", "--filter", "--limit"],
         "animations" => &["--game", "--filter", "--limit"],
+        "root-motion" => &[
+            "--game",
+            "--clip",
+            "--previous-frame",
+            "--current-frame",
+            "--relative-root",
+            "--reverse",
+        ],
         "animate" => &[
             "--game",
             "--clip",
@@ -159,7 +171,7 @@ fn run() -> Result<()> {
         .or_else(|| std::env::var_os("PROTOTYPE2_GAME").map(PathBuf::from))
         .context("supply --game <installed Prototype 2 directory> or PROTOTYPE2_GAME")?;
     ensure!(game.is_dir(), "game directory does not exist");
-    if command == "animations" || command == "animate" {
+    if command == "animations" || command == "animate" || command == "root-motion" {
         let boot = Archive::open(game.join("boot.rcf"))?;
         let data = p3d::decode(&boot.read(boot.find("art\\alex\\alex.p3d")?)?)?;
         let chunks = p3d::parse(&data)?;
@@ -181,6 +193,56 @@ fn run() -> Result<()> {
             println!(
                 "{} total clip headers; listing does not imply every encoding is playable",
                 all.len()
+            );
+            return Ok(());
+        }
+        if command == "root-motion" {
+            let name = options
+                .get("--clip")
+                .map(String::as_str)
+                .unwrap_or("heller_loco_run_n");
+            let clip = animation::load_clip(&data, &chunks, name)?;
+            let track = clip
+                .tracks
+                .get("Motion_Root")
+                .context("clip has no inspected Motion_Root track")?;
+            let previous = options
+                .get("--previous-frame")
+                .map(|s| s.parse())
+                .transpose()?
+                .unwrap_or(0.);
+            let current = options
+                .get("--current-frame")
+                .map(|s| s.parse())
+                .transpose()?
+                .unwrap_or(clip.info.last_frame());
+            let relative_translation = options
+                .get("--relative-root")
+                .map(|s| s.parse())
+                .transpose()?
+                .unwrap_or(false);
+            let reverse = options
+                .get("--reverse")
+                .map(|s| s.parse())
+                .transpose()?
+                .unwrap_or(false);
+            let interval = prototype2_rust::root_motion::Interval {
+                previous,
+                current,
+                first: 0.,
+                last: clip.info.last_frame(),
+                relative_translation,
+                reverse,
+            };
+            let motion = prototype2_rust::root_motion::delta(Some(track), interval)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "clip": clip.info, "joint": "Motion_Root", "previous_frame": previous,"current_frame": current,
+                    "relative_translation": relative_translation,"reverse": reverse,
+                    "translation": motion.translation.to_array(), "rotation_xyzw": motion.rotation.to_array(),
+                    "scope": "Authored single-clip root delta with at most one inferred cycle crossing; not actor movement, contacts or state scheduling"
+                }))?
             );
             return Ok(());
         }
@@ -598,7 +660,7 @@ fn help() {
     println!(
         "prototype2-rust: experimental retail-data viewer, NOT a playable reimplementation
 
-Commands: inspect | verify | scan | list | chunks | meta | capsule | fight | animations | animate | scene | ray | sweep | view | controller
+Commands: inspect | verify | scan | list | chunks | meta | capsule | fight | animations | animate | root-motion | scene | ray | sweep | view | controller
 Game commands require --game <Prototype 2 install directory> (or PROTOTYPE2_GAME)
 Selection: --archive cells.rcf --entry <internal path>
 list: --filter <substring> --limit 40
@@ -609,6 +671,7 @@ animations: --filter <clip substring> --limit 40 (character clip headers)
 animate: --clip <name> --sample-frame <frame> --loco-speed <inspection speed> --frames <count> --screenshot <private PNG path>
 Animation inspection: A/B next/previous clip; sticks orbit/zoom; X pause; Y restart; LB slow; Menu exit.
 Animation blend inspection: RB (keyboard L) toggles; left stick varies idle/walk/run speed; right stick orbits.
+root-motion: --clip <name> --previous-frame <frame> --current-frame <frame> --relative-root true/false --reverse true/false
 ray: --origin x,y,z --direction x,y,z
 capsule: decode the observed AlexPhysicsFactory asset (boot.rcf)
 sweep: --origin x,y,z --delta x,y,z (translation, not velocity; geometric query only)

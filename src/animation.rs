@@ -245,6 +245,61 @@ pub struct JointTrack {
     pub rotation: Option<Keys<Quat>>,
     pub translation: Option<Keys<Vec3>>,
 }
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TrackSample {
+    pub rotation: Option<Quat>,
+    pub translation: Option<Vec3>,
+}
+impl JointTrack {
+    /// Sample authored channels only. Absence remains distinct from bind fallback.
+    pub fn sample(&self, frame: f32) -> Result<TrackSample> {
+        ensure!(frame.is_finite(), "non-finite animation frame");
+        let rotation = self
+            .rotation
+            .as_ref()
+            .map(|keys| -> Result<Quat> {
+                keys.validate()?;
+                ensure!(
+                    keys.values
+                        .iter()
+                        .all(|q| q.is_finite() && q.is_normalized()),
+                    "invalid quaternion keys"
+                );
+                let (a, b, t) = keys.interval(frame);
+                Ok(if a == b || t == 0. {
+                    keys.values[a]
+                } else {
+                    keys.values[a].slerp(keys.values[b], t)
+                })
+            })
+            .transpose()?;
+        let translation = self
+            .translation
+            .as_ref()
+            .map(|keys| -> Result<Vec3> {
+                keys.validate()?;
+                ensure!(
+                    keys.values.iter().all(|v| v.is_finite()),
+                    "invalid translation keys"
+                );
+                let (a, b, t) = keys.interval(frame);
+                Ok(if a == b || t == 0. {
+                    keys.values[a]
+                } else {
+                    keys.values[a].lerp(keys.values[b], t)
+                })
+            })
+            .transpose()?;
+        ensure!(
+            rotation.is_none_or(|q| q.is_finite()) && translation.is_none_or(|p| p.is_finite()),
+            "animation channel interpolation overflow"
+        );
+        Ok(TrackSample {
+            rotation,
+            translation,
+        })
+    }
+}
 #[derive(Clone, Debug)]
 pub struct Clip {
     pub info: ClipInfo,
@@ -279,26 +334,9 @@ impl Clip {
             let (scale, mut rotation, mut translation) =
                 joint.bind_local.to_scale_rotation_translation();
             if let Some(track) = self.tracks.get(&joint.name) {
-                if let Some(keys) = &track.rotation {
-                    keys.validate()?;
-                    ensure!(
-                        keys.values
-                            .iter()
-                            .all(|q| q.is_finite() && q.is_normalized()),
-                        "invalid quaternion keys"
-                    );
-                    let (a, b, t) = keys.interval(frame);
-                    rotation = keys.values[a].slerp(keys.values[b], t);
-                }
-                if let Some(keys) = &track.translation {
-                    keys.validate()?;
-                    ensure!(
-                        keys.values.iter().all(|v| v.is_finite()),
-                        "invalid translation keys"
-                    );
-                    let (a, b, t) = keys.interval(frame);
-                    translation = keys.values[a].lerp(keys.values[b], t);
-                }
+                let sample = track.sample(frame)?;
+                rotation = sample.rotation.unwrap_or(rotation);
+                translation = sample.translation.unwrap_or(translation);
             }
             local.push(LocalTransform {
                 scale,

@@ -178,6 +178,56 @@ the primitive. Independent fixtures check a known blended child position, endpoi
 antipodal rotations, zero-dot behavior and overflowing composition. Installed-data
 checks sample six speeds on both 92-joint skeletons and reproduce the walk endpoint.
 
+## Authored root-motion extraction
+
+`root-motion --clip heller_loco_run_n` now reports the original `Motion_Root`
+track's displacement/rotation from frame zero to last frame. Explicit endpoints
+use `--previous-frame` and `--current-frame`; `--relative-root true` chooses
+segment-start orientation coordinates, and `--reverse true` applies the native
+endpoint-swap/output-reversal policy. The command is available in core-only builds.
+It does not infer a tick, integrate a character or use a contact solver.
+
+The independent `root_motion::delta` primitive follows translation consumers
+**0x1062cc30 / 0x1062ccd0**, rotation consumer **0x1062cb00** and dispatcher
+**0x1062ced0**. For ordered endpoints it subtracts authored translation and computes
+inverse-start times end rotation in glam's convention. A decreasing endpoint
+crosses the loop boundary once: combine the previous-to-last and first-to-current
+segments. Relative translation rotates each segment by that segment's inverse
+starting orientation. Rotation combines the second segment times the first;
+reverse swaps endpoints before this calculation, then negates translation and
+conjugates rotation. Equal endpoints mean zero motion, not a complete cycle;
+endpoint pairs cannot represent multiple crossings. Clip/scheduler policy remains
+responsible for deciding the actual interval and flags.
+
+Quaternion product **0x107e93f0** uses a row convention that corresponds to reversed
+Hamilton product order; relative helper **0x107e9fe0** conjugates its second input.
+Vector rotation **0x107e9ca0** corroborates the orientation-coordinate conversion.
+Noncommuting synthetic rotations check this order independently by their action
+on basis vectors. Wrapped/cropped/reversed intervals, missing channels, malformed
+keys, finite bounds and overflow are tested. Missing authored channels remain
+distinct from skeleton bind fallback. Native key samplers return the first value
+directly at zero interpolation fraction; the Rust channel sampler now does too,
+avoiding an unused overflowing difference at a valid extreme endpoint.
+
+Measured full-clip translation in the installed corpus (asset units):
+
+| Clip | Raw XYZ | Segment-relative XYZ |
+| --- | --- | --- |
+| `alex_amb_stand` | (0,0,0) | (0,0,0) |
+| `heller_loco_walk_n` | (0,0,-1.659999967) | same |
+| `heller_loco_run_n` | (0,0,3.975730419) | (0,0,-3.975730419) |
+| `heller_loco_run_sprint_n` | (0,0,-4.999793053) | same |
+| `heller_loco_jump_from_idle` | (0.061584473,1.041015625,-1.624023438) | same |
+
+Rotation deltas are identity within 0.00001 for these endpoint pairs. Run's
+authored root orientation causes its raw/relative Z sign difference; changing
+quaternion ordering to hide it would be incorrect. Clip distance divided by
+duration is not a confirmed gameplay speed: the main graph supplies explicit
+walk/run velocity references (1.5/4.5). Jump's full-clip endpoint and duration do
+not establish gameplay jump height or jump timing. Playback still uses the
+root-neutral preview; actual interval selection, blended root-driver evaluation,
+actor integration, contacts and original-game trace comparison remain incomplete.
+
 Materials are diagnostic colors. Morph/cloth/expression assembly, constraints,
 retail shaders, motion events, transitions, layered blends, grounded movement and
 camera behavior remain unresolved. Some shoulder/hood geometry visibly overlaps.

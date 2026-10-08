@@ -81,6 +81,7 @@ All commands accept `--game`, or the `PROTOTYPE2_GAME` environment variable.
 | `fight --filter bare/loco --limit 10` | Checked character graphs and selected main movement/capsule tracks, read directly from boot.rcf |
 | `animations --filter heller --limit 40` | Checked character clip headers, names, fps and frame ranges |
 | `animate` | Original skinned Heller playing original clips and recovered idle/walk/run blends, with Xbox inspection controls |
+| `root-motion --clip heller_loco_run_n` | Recovered authored root delta for explicit frame endpoints; raw/relative spaces, loop crossing and reverse policy; no actor integration |
 | `scene` | Selected cell's geometry/collision counts, bounds and limitations |
 | `ray --origin 1266,80,-1932 --direction 0,-1,0` | Experimental geometric collision query |
 | `sweep --origin 1218.130,55.001,-1898.738 --delta 0,-50,0` | Swept asset capsule against real ground triangles; experimental geometry, no movement response |

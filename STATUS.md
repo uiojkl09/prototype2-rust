@@ -37,6 +37,10 @@ format/research/validation notes; do not repeat the archive investigation.
   scaling, checked sync offsets and frame mapping. Local idle/walk/run pose blending
   now reaches the renderer; RB/left stick inspect it in place. State scheduling and
   native quaternion approximation parity remain separate work, documented in ANIMATION.md.
+- Recovered single-clip root displacement/rotation extraction: zero/one inferred
+  cycle crossing, segment-relative translation and reverse flags. `root-motion`
+  reports explicit frame endpoints; five real root tracks measured in both spaces.
+  This is authored clip motion, with no actor/contact integration or scheduler.
 
 ## Incomplete / unknown
 
