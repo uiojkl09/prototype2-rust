@@ -53,6 +53,10 @@ format/research/validation notes; do not repeat the archive investigation.
 - Bare punch/kick, blade activation and shield fixed-pose captures were inspected;
   continuous punch playback advances. Weapon meshes and complete power/model/cloth
   assembly remain incomplete. Controller-bank switching passed actual-window automation.
+- Checked original animation action properties: 549 records with frame ranges,
+  speed/blend timing, partitions, synchronization references and root flags.
+  `fight` displays them; 398 clip references join this character package exactly,
+  while 151 remain unresolved. Enum policies and the scheduler are not executed.
 
 ## Incomplete / unknown
 
@@ -88,6 +92,8 @@ format/research/validation notes; do not repeat the archive investigation.
 1. **Animation before textures**, following the owner's priority. Continue from
    docs/ANIMATION.md: original clips now play. Recover animation/action references,
    transitions, blending and the root-motion driver, then connect them to state.
+   The 549 ordinary animation records now decode; use their retained timing/frame
+   properties rather than treating whole-clip preview loops as action playback.
 2. Continue from docs/FIGHT.md: graph serialization and selected LocoSteer/capsule
    schemas are implemented. Resolve conditions/references, sprint/jump drivers and
    action scheduling. Recover active hull/transforms, filtering and contact response

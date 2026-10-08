@@ -547,13 +547,17 @@ fn run() -> Result<()> {
                     "capsule_tracks": graph.records.iter().filter(|r| r.capsule.is_some()).count(),
                 "steer_tracks": graph.records.iter().filter(|r| r.steer.is_some()).count(),
                 "sprint_tracks": graph.records.iter().filter(|r| r.sprint.is_some()).count(),
+                "animation_tracks": graph.records.iter().filter(|r| r.animation.is_some()).count(),
                 }))?
             );
             let matched: Vec<_> = graph
                 .records
                 .iter()
                 .filter(|r| {
-                    (r.capsule.is_some() || r.steer.is_some() || r.sprint.is_some())
+                    (r.capsule.is_some()
+                        || r.steer.is_some()
+                        || r.sprint.is_some()
+                        || r.animation.is_some())
                         && graph.branch_matches(r.branch, filter)
                 })
                 .collect();

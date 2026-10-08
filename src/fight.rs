@@ -53,6 +53,7 @@ pub struct Record {
     pub capsule: Option<CapsuleTrack>,
     pub steer: Option<SteerTrack>,
     pub sprint: Option<SprintTrack>,
+    pub animation: Option<AnimationTrack>,
 }
 #[derive(Debug, Serialize)]
 pub struct Graph {
@@ -122,6 +123,36 @@ pub struct CapsuleTrack {
     pub radius: Animated<f32>,
     pub axis: Animated<[f32; 3]>,
     pub rotation_degrees: Animated<[f32; 3]>,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct AnimationTrack {
+    pub header: TrackHeader,
+    pub animation: u64,
+    pub speed: f32,
+    pub random_speed_variation: f32,
+    pub init_frame: f32,
+    pub start_frame: f32,
+    pub end_frame: f32,
+    /// Serialized enum-name hash; no scheduler policy is inferred from it.
+    pub cyclic: u64,
+    pub sync_frame: bool,
+    pub phase_match: bool,
+    /// Serialized enum-name hash; retained without executing synchronization.
+    pub sync_phase: u64,
+    pub sync_phase_min_frame: f32,
+    pub sync_phase_max_frame: f32,
+    pub reuse_existing_driver: bool,
+    pub has_root_translation: bool,
+    pub has_root_rotation: bool,
+    pub blend_out_root_translation: bool,
+    pub blend_out_root_rotation: bool,
+    pub additive_joints: bool,
+    pub partition: u64,
+    pub weight: f32,
+    pub priority: i32,
+    pub blend_in: f32,
+    pub blend_out: f32,
+    pub synch_tracks_branch: BranchReference,
 }
 #[derive(Clone, Debug, Serialize)]
 pub struct SteerTrack {
@@ -278,6 +309,45 @@ pub fn steer_track(bytes: &[u8]) -> Result<SteerTrack> {
         slave_branch: reference(&mut c)?,
     };
     ensure!(c.pos == bytes.len(), "steer track trailing bytes");
+    Ok(track)
+}
+
+/// Inspected PuppetAnimationTrack properties. Decoding does not execute an action.
+pub fn animation_track(bytes: &[u8]) -> Result<AnimationTrack> {
+    ensure!(
+        (132..=132 + MAX_STRING).contains(&bytes.len()),
+        "unsupported animation track length {}",
+        bytes.len()
+    );
+    let mut c = Cursor::new(bytes);
+    let track = AnimationTrack {
+        header: header(&mut c)?,
+        animation: u64(&mut c)?,
+        speed: c.f32()?,
+        random_speed_variation: c.f32()?,
+        init_frame: c.f32()?,
+        start_frame: c.f32()?,
+        end_frame: c.f32()?,
+        cyclic: u64(&mut c)?,
+        sync_frame: boolean(&mut c)?,
+        phase_match: boolean(&mut c)?,
+        sync_phase: u64(&mut c)?,
+        sync_phase_min_frame: c.f32()?,
+        sync_phase_max_frame: c.f32()?,
+        reuse_existing_driver: boolean(&mut c)?,
+        has_root_translation: boolean(&mut c)?,
+        has_root_rotation: boolean(&mut c)?,
+        blend_out_root_translation: boolean(&mut c)?,
+        blend_out_root_rotation: boolean(&mut c)?,
+        additive_joints: boolean(&mut c)?,
+        partition: u64(&mut c)?,
+        weight: c.f32()?,
+        priority: i32(&mut c)?,
+        blend_in: c.f32()?,
+        blend_out: c.f32()?,
+        synch_tracks_branch: reference(&mut c)?,
+    };
+    ensure!(c.pos == bytes.len(), "animation track trailing bytes");
     Ok(track)
 }
 
@@ -489,6 +559,17 @@ fn branches(
                 } else {
                     None
                 };
+                let animation = if ["tracks", "initialTracks", "enterTracks", "exitTracks"]
+                    .contains(&group)
+                    && entry.key == self::name_hash("animation")
+                {
+                    Some(
+                        animation_track(entry.body)
+                            .with_context(|| format!("animation track at 0x{:x}", entry.offset))?,
+                    )
+                } else {
+                    None
+                };
                 graph.records.push(Record {
                     offset: entry.offset,
                     body_offset: entry.body_offset,
@@ -499,6 +580,7 @@ fn branches(
                     capsule,
                     steer,
                     sprint,
+                    animation,
                 });
             }
             ensure!(

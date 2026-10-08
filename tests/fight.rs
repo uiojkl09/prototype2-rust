@@ -127,3 +127,131 @@ fn capsule_track_requires_boolean_flags_and_finite_fields() {
     assert!(fight::sprint_track(&sprint).is_err());
     assert!(fight::sprint_track(&sprint[..207]).is_err());
 }
+fn animation_fixture(branch_name: &str) -> Vec<u8> {
+    let mut bytes = vec![0; 124];
+    for (offset, value) in [(0, -1i32), (112, -2)] {
+        bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+    for offset in [4, 52, 76, 80, 92] {
+        bytes[offset..offset + 4].copy_from_slice(&1u32.to_le_bytes());
+    }
+    for (offset, value) in [
+        (8, 2f32),
+        (12, -1.),
+        (24, -1.),
+        (28, 0.25),
+        (32, -1.),
+        (36, 10.),
+        (40, -2.),
+        (68, 4.),
+        (72, -1.),
+        (108, 0.75),
+        (116, -0.2),
+        (120, 0.25),
+    ] {
+        bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+    for (offset, value) in [
+        (16, name_hash("synthetic_clip")),
+        (44, name_hash("synthetic_cycle_policy")),
+        (60, name_hash("synthetic_sync_policy")),
+        (100, name_hash("upper_body")),
+    ] {
+        bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
+    }
+    string(&mut bytes, branch_name);
+    bytes.extend((-1i32).to_le_bytes());
+    bytes
+}
+#[test]
+fn original_animation_track_preserves_timing_channels_flags_and_unresolved_policies() {
+    let bytes = animation_fixture("a/b");
+    let track = fight::animation_track(&bytes).unwrap();
+    assert_eq!(
+        (track.header.reference_index, track.header.is_slave),
+        (-1, true)
+    );
+    assert_eq!((track.header.time_begin, track.header.time_end), (2., -1.));
+    assert_eq!(track.animation, name_hash("synthetic_clip"));
+    assert_eq!((track.speed, track.random_speed_variation), (-1., 0.25));
+    assert_eq!(
+        [track.init_frame, track.start_frame, track.end_frame],
+        [-1., 10., -2.]
+    );
+    assert_eq!(track.cyclic, name_hash("synthetic_cycle_policy"));
+    assert_eq!(track.sync_phase, name_hash("synthetic_sync_policy"));
+    assert!(track.sync_frame && !track.phase_match && track.reuse_existing_driver);
+    assert_eq!(
+        [track.sync_phase_min_frame, track.sync_phase_max_frame],
+        [4., -1.]
+    );
+    assert!(track.has_root_translation && !track.has_root_rotation);
+    assert!(
+        !track.blend_out_root_translation
+            && track.blend_out_root_rotation
+            && !track.additive_joints
+    );
+    assert_eq!(
+        (track.partition, track.weight, track.priority),
+        (name_hash("upper_body"), 0.75, -2)
+    );
+    assert_eq!([track.blend_in, track.blend_out], [-0.2, 0.25]);
+    assert_eq!(
+        (
+            &*track.synch_tracks_branch.name,
+            track.synch_tracks_branch.index
+        ),
+        ("a/b", -1)
+    );
+    let mut group = Vec::new();
+    u32(&mut group, 2);
+    group.extend(record("animation", &bytes));
+    group.extend(record("Animation", &[0; 3])); // Case changes the type hash.
+    let graph = fight::parse_body(
+        &graph(&branch(&record("tracks", &group)), 2),
+        100,
+        "synthetic",
+    )
+    .unwrap();
+    assert_eq!(graph.records.len(), 2);
+    assert_eq!(
+        graph.records[0].animation.as_ref().unwrap().animation,
+        track.animation
+    );
+    assert!(graph.records[1].animation.is_none());
+}
+#[test]
+fn animation_track_rejects_all_short_prefixes_bad_flags_strings_and_nonfinite_values() {
+    let bytes = animation_fixture("a/b");
+    for len in 0..bytes.len() {
+        assert!(
+            fight::animation_track(&bytes[..len]).is_err(),
+            "accepted prefix {len}"
+        );
+    }
+    for offset in [4, 52, 56, 76, 80, 84, 88, 92, 96] {
+        let mut bad = bytes.clone();
+        bad[offset..offset + 4].copy_from_slice(&2u32.to_le_bytes());
+        assert!(fight::animation_track(&bad).is_err());
+    }
+    for offset in [8, 12, 24, 28, 32, 36, 40, 68, 72, 108, 116, 120] {
+        for value in [f32::NAN, f32::INFINITY] {
+            let mut bad = bytes.clone();
+            bad[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            assert!(fight::animation_track(&bad).is_err());
+        }
+    }
+    for (offset, value) in [(0, -2i32), (132, -2), (124, 4097)] {
+        let mut bad = bytes.clone();
+        bad[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+        assert!(fight::animation_track(&bad).is_err());
+    }
+    for (offset, value) in [(128, 0u8), (128, 255), (131, 1)] {
+        let mut bad = bytes.clone();
+        bad[offset] = value;
+        assert!(fight::animation_track(&bad).is_err());
+    }
+    let mut bad = bytes;
+    bad.push(0);
+    assert!(fight::animation_track(&bad).is_err());
+}

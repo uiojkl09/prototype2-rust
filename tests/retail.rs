@@ -3,6 +3,94 @@ use prototype2_rust::{capsule, collision, fight, meta, p3d, rcf::Archive, scene}
 
 #[test]
 #[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
+fn installed_animation_actions_preserve_cropped_frames_and_exact_reference_limits() {
+    use prototype2_rust::animation;
+    let game = std::path::PathBuf::from(std::env::var_os("PROTOTYPE2_GAME").unwrap());
+    let boot = Archive::open(game.join("boot.rcf")).unwrap();
+    let fig = p3d::decode(
+        &boot
+            .read(boot.find("art\\alex\\alex_fig.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let graphs = fight::load(&fig, &p3d::parse(&fig).unwrap()).unwrap();
+    let data = p3d::decode(
+        &boot
+            .read(boot.find("art\\alex\\alex.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let clips = animation::clips(&data, &p3d::parse(&data).unwrap()).unwrap();
+    let mut actions = 0;
+    let mut joined = 0;
+    let mut unresolved = 0;
+    let mut referenced_branches = 0;
+    for graph in &graphs {
+        for record in &graph.records {
+            let Some(track) = &record.animation else {
+                continue;
+            };
+            actions += 1;
+            assert_eq!(record.type_hash, fight::name_hash("animation"));
+            assert_eq!(track.random_speed_variation, 0.);
+            assert_eq!(track.sync_phase, 3349652082457766725);
+            if !track.synch_tracks_branch.name.is_empty() {
+                referenced_branches += 1;
+            }
+            match animation::resolve_clip(&clips, track.animation) {
+                Ok(clip) => {
+                    assert_eq!(fight::name_hash(&clip.name), track.animation);
+                    joined += 1;
+                }
+                Err(_) => {
+                    assert!(
+                        !clips
+                            .iter()
+                            .any(|c| fight::name_hash(&c.name) == track.animation)
+                    );
+                    unresolved += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(
+        (actions, joined, unresolved, referenced_branches),
+        (549, 398, 151, 10)
+    );
+    let graph = graphs.iter().find(|g| g.name == "prototype_air").unwrap();
+    let record = graph.records.iter().find(|r| r.offset == 0x87601).unwrap();
+    assert_eq!(record.body_bytes, 172);
+    let track = record.animation.as_ref().unwrap();
+    assert_eq!(
+        animation::resolve_clip(&clips, track.animation)
+            .unwrap()
+            .name,
+        "heller_loco_jump_from_idle"
+    );
+    assert_eq!(
+        [
+            track.init_frame,
+            track.start_frame,
+            track.end_frame,
+            track.speed
+        ],
+        [0., 56., -1., 1.]
+    );
+    assert!(track.has_root_translation && track.has_root_rotation && !track.additive_joints);
+    assert_eq!(
+        (
+            &*track.synch_tracks_branch.name,
+            track.synch_tracks_branch.index
+        ),
+        ("//prototype_firearm/firearm_partition", -1)
+    );
+    println!(
+        "549 original animation records decoded; 398 exact clip joins / 151 unresolved in this package. Air pose at 0x87601 retains start 56 and external synchronization branch; no action/state execution implied."
+    );
+}
+
+#[test]
+#[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
 fn installed_skeletal_corpus_samples_with_authored_scale_and_disabled_metadata() {
     use prototype2_rust::animation;
     let game = std::path::PathBuf::from(std::env::var_os("PROTOTYPE2_GAME").unwrap());

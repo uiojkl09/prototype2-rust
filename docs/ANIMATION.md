@@ -5,6 +5,10 @@ Rust runtime. This is inspection playback: it does not yet execute the game's
 animation state machine, action scheduling, layered blending, root-motion driver or contacts.
 The recovered standalone idle/walk/run blend now also deforms the character.
 Animation integration takes priority over textures.
+The 549 ordinary animation action records now decode with their original clip,
+frame, speed, synchronization, blend and root properties. See FIGHT.md for layout,
+exact-reference coverage and the selected action starting partway through a jump
+clip. The viewer continues to inspect whole clips; the scheduler is not implemented.
 
 ## Run and controller controls
 

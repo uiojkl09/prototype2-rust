@@ -96,6 +96,66 @@ the action also applies upgrades, actor input modes and turn-dependent slowdown.
 They do not establish measured travel speed or a complete sprint implementation.
 Native actions begin/update at 0x101e1570/0x101e1c10 provide the next rule evidence.
 
+## Ordinary animation action properties
+
+The `animation` type token is **0x40db3810babb057a**, the case-preserving hash of
+that lowercase label. All **549** inspected records now decode through an original
+Rust reader. Native `PuppetAnimationTrack` property registration **0x1034b2c0**
+corroborates the ordered fields/types; its action factory is **0x103495c0**.
+This decodes authored action configuration, without running its lifecycle.
+
+After the reference-index/slave prefix, the ordered fields are:
+
+| Fields | Stored representation |
+| --- | --- |
+| timeBegin, timeEnd | f32 pair, included in TrackHeader |
+| animation | u64 clip-name hash |
+| speed, randomSpeedVariation | f32 pair |
+| initFrame, startFrame, endFrame | three f32 values |
+| cyclic | u64 enum-name hash, retained without interpreting its policy |
+| syncFrame, phaseMatch | checked 0/1 u32 pair |
+| syncPhase | u64 enum-name hash, retained without executing synchronization |
+| syncPhaseMinFrame, syncPhaseMaxFrame | f32 pair |
+| reuseExistingDriver | checked boolean |
+| hasRootTranslation, hasRootRotation | checked boolean pair |
+| blendOutRootTranslation, blendOutRootRotation, additiveJoints | three checked booleans |
+| partition | u64 partition-name hash |
+| weight, priority | f32, i32 |
+| blendInTime, blendOutTime | f32 pair |
+| synchTracksBranch | bounded string32 and checked i32 reference index |
+
+The empty synchronization reference gives **132 bytes**; 539 records use it.
+Ten have a nonempty external branch reference and **172 bytes**. Readers check
+complete payloads, finite floats, boolean widths, bounded UTF-8/padding and reference
+indices. Negative frame/time/speed/blend values remain authored values; the reader
+does not replace them with a guessed sentinel interpretation. Enum and partition
+hashes remain explicit unresolved policy/reference fields.
+
+Exact name-hash matching against the 931 headers in `alex.p3d` resolves **398**
+action records. **151** have no matching clip in that package; these references
+remain unresolved. This is a package-local join, not proof that those references
+are invalid in the complete retail resource set. No similar-name substitutions
+or synthetic clips are installed. All observed randomSpeedVariation values are zero.
+
+In `prototype_air`, record **0x87601** references `heller_loco_jump_from_idle`,
+with init frame 0, start frame **56**, end frame -1, speed 1, root translation and
+rotation enabled, and external synchronization reference
+`//prototype_firearm/firearm_partition` / index -1. Its cropped pose use is why
+whole-clip preview playback cannot be treated as original action timing or a jump.
+Reference presence alone does not establish branch reachability or active execution.
+
+`fight --filter air/fall --limit 6` displays decoded records and per-context counts.
+Synthetic tests cover field ordering, negative/raw policy preservation, case-sensitive
+dispatch, all truncated prefixes, trailing bytes, bad flags/references/UTF-8/padding
+and nonfinite values. Installed-data tests check all 549 layouts, exact join counts
+and the selected cropped-frame/external-reference record.
+
+Native begin/end/update **0x10348950 / 0x103494f0 / 0x10349660** show additional
+driver reuse, synchronization, component selection, cropping, blend/event and root
+policies. These consumers are research leads, not implemented state execution.
+Action clock, conditions/priority, event order, partitions/additive layers and actor
+integration remain necessary before these configurations can drive gameplay.
+
 ## Capsule state changes
 
 Fourteen 136-byte `physicsCollisionCapsule` records were decoded across these
