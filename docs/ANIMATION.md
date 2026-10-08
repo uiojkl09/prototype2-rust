@@ -8,7 +8,8 @@ Animation integration takes priority over textures.
 The 549 ordinary animation action records now decode with their original clip,
 frame, speed, synchronization, blend and root properties. See FIGHT.md for layout,
 exact-reference coverage and the selected action starting partway through a jump
-clip. The viewer continues to inspect whole clips; the scheduler is not implemented.
+clip. The viewer now supports isolated cropped/signed playback; the scheduler is
+not implemented.
 
 ## Run and controller controls
 
@@ -40,6 +41,49 @@ discards the fixed-speed override. `Animate.ps1 -LocomotionSpeed 3` also support
 `--sample-frame 10.5` fixes a pose and disables clip switching. `--frames 180
 --screenshot <path>` captures a bounded run. Keyboard fallback is Space, R,
 Left/Right and Escape. `scripts/Animate.ps1` launches playback and saves a log.
+
+`--clip-start 56 --clip-end -1 --clip-loop false` on the jump clip inspects the
+cropped range retained by air-pose record 0x87601. It does not execute that branch.
+`--clip-speed -1` inspects reverse playback, starting at the cropped end; zero
+holds a pose. `--clip-duration 2` fits the range to two seconds using the requested
+speed's sign. These options pin clip selection and disable blend-mode switching;
+sticks, pause, restart, slow playback and exit remain available. They cannot be
+combined with `--loco-speed`. A fixed sample must be inside the cropped range.
+The launch script accepts ClipStart/ClipEnd/ClipSpeed/ClipDuration/ClipLoop strings.
+
+## Cropped single-clip driver
+
+`animation_clock.rs` implements the isolated skeletal driver's range setup and
+explicit caller-time frame math. Native setup **0x10623f30** calls start/end setters
+**0x10621540 / 0x10620c30** through wrappers **0x10623990 / 0x106239b0**.
+Start clamps to zero through count minus one. A negative raw end first adds the
+serialized **count**; the end setter then clamps to start through the full last
+frame. An end still negative after conversion selects the full last frame. Other
+component paths resolve negative starts/init frames differently; this primitive
+does not generalize those policies.
+
+Setup fits speed to sign(requested speed) times the range's unit-speed duration
+divided by requested duration only when duration exceeds **0.00001** and the driver
+is noncyclic at setup. Otherwise it retains requested speed. Constructor
+**0x10623e20** initially clears cyclic state; action begin **0x10348950** applies
+its cyclic policy after setup, and driver reuse can change the input state. The
+API therefore takes this state explicitly and never substitutes clip metadata.
+The viewer configures a fresh noncyclic driver, then separately applies its
+explicit preview-loop option, defaulting to true.
+
+Duration getter **0x106239d0** uses absolute range width divided by fps times speed;
+near-zero fps/speed returns -1 (represented by None in the checked API). Delta
+**0x10623c80** is fps times speed times supplied seconds. Frame helper
+**0x10623bd0** clamps noncyclic frames or uses **0x100690d0** periodic mapping;
+wrapped endpoints use **0.00001**, while already in-range frames stay unchanged.
+Finite inputs and arithmetic are checked. Rust uses f64 intermediates where
+appropriate; exact x87 instruction/rounding parity remains unproven.
+
+This is not an action clock/state machine: initialization/synchronization, cyclic
+enum interpretation, completion/events, reuse, layers and actor integration remain
+unresolved. Preview restart at the end for reverse speed is an inspection convention,
+not recovered action initFrame behavior. Presentation time remains focus-gated
+and capped at 0.1 seconds per render, separate from a future recovered simulation tick.
 
 ## Corpus and evidence
 

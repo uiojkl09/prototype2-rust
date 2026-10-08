@@ -40,6 +40,8 @@ compatibility with every actor or execute their gameplay actions.
 Original animation action properties also decode through `fight`, including
 cropped frames, speed/blend timing and root flags. Their state execution remains
 incomplete; see [action evidence](docs/FIGHT.md).
+The viewer also supports cropped frame ranges, signed speed, duration fitting and
+explicit loop/clamp inspection; see [driver options](docs/ANIMATION.md).
 
 Use `view --game <directory>` for the world section. **World viewer Xbox controls:**
 left stick to move, right stick to look, A/B to rise/descend,

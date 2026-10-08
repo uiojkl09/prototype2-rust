@@ -40,6 +40,19 @@ fn installed_animation_actions_preserve_cropped_frames_and_exact_reference_limit
             match animation::resolve_clip(&clips, track.animation) {
                 Ok(clip) => {
                     assert_eq!(fight::name_hash(&clip.name), track.animation);
+                    let timing = prototype2_rust::animation_clock::ClipTiming::configure(
+                        clip,
+                        track.start_frame,
+                        track.end_frame,
+                        track.header.time_end - track.header.time_begin,
+                        track.speed,
+                        false,
+                    )
+                    .unwrap();
+                    for cyclic in [false, true] {
+                        let frame = timing.advance(timing.first_frame(), 0.125, cyclic).unwrap();
+                        assert!((timing.first_frame()..=timing.last_frame()).contains(&frame));
+                    }
                     joined += 1;
                 }
                 Err(_) => {
@@ -77,6 +90,23 @@ fn installed_animation_actions_preserve_cropped_frames_and_exact_reference_limit
         [0., 56., -1., 1.]
     );
     assert!(track.has_root_translation && track.has_root_rotation && !track.additive_joints);
+    let clip = animation::resolve_clip(&clips, track.animation).unwrap();
+    let cropped = prototype2_rust::animation_clock::ClipTiming::configure(
+        clip,
+        track.start_frame,
+        track.end_frame,
+        -1.,
+        track.speed,
+        false,
+    )
+    .unwrap();
+    assert_eq!(cropped.first_frame(), 56.);
+    assert_eq!(cropped.last_frame(), clip.last_frame());
+    assert_eq!(cropped.advance(56., 0.1, false).unwrap(), 59.);
+    assert_eq!(
+        cropped.advance(56., 100., false).unwrap(),
+        clip.last_frame()
+    );
     assert_eq!(
         (
             &*track.synch_tracks_branch.name,
@@ -85,7 +115,7 @@ fn installed_animation_actions_preserve_cropped_frames_and_exact_reference_limit
         ("//prototype_firearm/firearm_partition", -1)
     );
     println!(
-        "549 original animation records decoded; 398 exact clip joins / 151 unresolved in this package. Air pose at 0x87601 retains start 56 and external synchronization branch; no action/state execution implied."
+        "549 original animation records decoded; 398 exact clip joins / 151 unresolved in this package. Joined configurations pass isolated driver range/step checks. Air pose at 0x87601 retains start 56 and external synchronization branch; no action/state execution implied."
     );
 }
 

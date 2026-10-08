@@ -153,6 +153,9 @@ and the selected cropped-frame/external-reference record.
 Native begin/end/update **0x10348950 / 0x103494f0 / 0x10349660** show additional
 driver reuse, synchronization, component selection, cropping, blend/event and root
 policies. These consumers are research leads, not implemented state execution.
+The isolated skeletal driver's cropped range/speed/frame math now exists in
+`animation_clock.rs` and the preview renderer; see ANIMATION.md. It does not resolve
+the action's initFrame, sync or cyclic policies or schedule these records.
 Action clock, conditions/priority, event order, partitions/additive layers and actor
 integration remain necessary before these configurations can drive gameplay.
 

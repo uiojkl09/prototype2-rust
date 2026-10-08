@@ -3,6 +3,11 @@ param(
     [string]$GameDirectory = $env:PROTOTYPE2_GAME,
     [string]$Clip = 'heller_loco_run_n',
     [string]$LocomotionSpeed,
+    [string]$ClipStart,
+    [string]$ClipEnd,
+    [string]$ClipSpeed,
+    [string]$ClipDuration,
+    [string]$ClipLoop,
     [string]$LogDirectory,
     [string]$DeadZone,
     [double]$LookSpeed = 2.0,
@@ -28,5 +33,10 @@ $viewerArguments = @('animate', '--game', $GameDirectory, '--clip', $Clip,
     '--invert-y', $InvertY.IsPresent.ToString().ToLowerInvariant())
 if ($DeadZone) { $viewerArguments += @('--dead-zone', $DeadZone) }
 if ($LocomotionSpeed) { $viewerArguments += @('--loco-speed', $LocomotionSpeed) }
+if ($ClipStart) { $viewerArguments += @('--clip-start', $ClipStart) }
+if ($ClipEnd) { $viewerArguments += @('--clip-end', $ClipEnd) }
+if ($ClipSpeed) { $viewerArguments += @('--clip-speed', $ClipSpeed) }
+if ($ClipDuration) { $viewerArguments += @('--clip-duration', $ClipDuration) }
+if ($ClipLoop) { $viewerArguments += @('--clip-loop', $ClipLoop) }
 & $binary @viewerArguments 2>&1 | Tee-Object -FilePath $logPath
 if ($LASTEXITCODE -ne 0) { throw "Animation viewer failed; see $logPath" }

@@ -53,6 +53,11 @@ fn run() -> Result<()> {
                 "--clip",
                 "--sample-frame",
                 "--loco-speed",
+                "--clip-start",
+                "--clip-end",
+                "--clip-speed",
+                "--clip-duration",
+                "--clip-loop",
                 "--previous-frame",
                 "--current-frame",
                 "--relative-root",
@@ -92,6 +97,11 @@ fn run() -> Result<()> {
             "--clip",
             "--sample-frame",
             "--loco-speed",
+            "--clip-start",
+            "--clip-end",
+            "--clip-speed",
+            "--clip-duration",
+            "--clip-loop",
             "--frames",
             "--screenshot",
             "--dead-zone",
@@ -329,6 +339,43 @@ fn run() -> Result<()> {
                 sample_frame.is_none() || locomotion_speed.is_none(),
                 "--sample-frame and --loco-speed cannot be combined"
             );
+            let custom_timing = [
+                "--clip-start",
+                "--clip-end",
+                "--clip-speed",
+                "--clip-duration",
+                "--clip-loop",
+            ]
+            .iter()
+            .any(|key| options.contains_key(*key));
+            ensure!(
+                !custom_timing || locomotion_speed.is_none(),
+                "clip timing options and --loco-speed cannot be combined"
+            );
+            let clip_loop = options
+                .get("--clip-loop")
+                .map(|s| s.parse())
+                .transpose()?
+                .unwrap_or(true);
+            let clip_timing = if custom_timing {
+                let value = |key: &str, default: f32| -> Result<f32> {
+                    Ok(options
+                        .get(key)
+                        .map(|s| s.parse())
+                        .transpose()?
+                        .unwrap_or(default))
+                };
+                Some(prototype2_rust::animation_clock::ClipTiming::configure(
+                    &clips[0].info,
+                    value("--clip-start", 0.)?,
+                    value("--clip-end", -1.)?,
+                    value("--clip-duration", -1.)?,
+                    value("--clip-speed", 1.)?,
+                    false,
+                )?)
+            } else {
+                None
+            };
             let indices: [usize; 3] = names
                 .iter()
                 .map(|name| {
@@ -353,6 +400,11 @@ fn run() -> Result<()> {
                     .is_none_or(|n| n.is_finite() && n >= 0. && n <= clips[0].info.last_frame()),
                 "--sample-frame out of clip range"
             );
+            ensure!(
+                sample_frame.is_none_or(|frame| clip_timing
+                    .is_none_or(|t| frame >= t.first_frame() && frame <= t.last_frame())),
+                "--sample-frame out of cropped clip range"
+            );
             animation_viewer::run(
                 skeletons,
                 meshes,
@@ -368,6 +420,8 @@ fn run() -> Result<()> {
                     screenshot: options.get("--screenshot").map(PathBuf::from),
                     sample_frame,
                     locomotion_speed,
+                    clip_timing,
+                    clip_loop,
                 },
                 settings,
             )?;
@@ -685,6 +739,7 @@ meta: --filter <ASCII name or body reference> --limit 40
 fight: --filter <branch path substring> --limit 40 (defaults to boot.rcf / art\\alex\\alex_fig.p3d)
 animations: --filter <clip substring> --limit 40 (character clip headers)
 animate: --clip <name> --sample-frame <frame> --loco-speed <inspection speed> --frames <count> --screenshot <private PNG path>
+  cropped inspection: --clip-start <frame> --clip-end <frame or negative count offset> --clip-speed <signed rate> --clip-duration <seconds> --clip-loop <true/false>
 Animation inspection: A/B next/previous clip; sticks orbit/zoom; X pause; Y restart; LB slow; Menu exit.
 Animation blend inspection: RB (keyboard L) toggles; left stick varies idle/walk/run speed; right stick orbits.
 root-motion: --clip <name> --previous-frame <frame> --current-frame <frame> --relative-root true/false --reverse true/false

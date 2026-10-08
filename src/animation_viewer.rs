@@ -7,6 +7,7 @@ use bevy::{
 };
 use prototype2_rust::{
     animation::{Clip, Skeleton},
+    animation_clock::ClipTiming,
     animation_driver, controller,
     pose_fixup::BoundFixups,
     skin::SkinMesh,
@@ -18,6 +19,7 @@ struct Character {
     skeletons: Vec<Skeleton>,
     skins: Vec<SkinMesh>,
     clips: Vec<Clip>,
+    timings: Vec<ClipTiming>,
     fixups: Vec<BoundFixups>,
     locomotion: LocomotionPreview,
 }
@@ -31,6 +33,8 @@ pub struct Inspection {
     pub screenshot: Option<PathBuf>,
     pub sample_frame: Option<f32>,
     pub locomotion_speed: Option<f32>,
+    pub clip_timing: Option<ClipTiming>,
+    pub clip_loop: bool,
 }
 #[derive(Resource)]
 struct Playback {
@@ -52,6 +56,8 @@ struct Playback {
     speed: f32,
     weights: [f32; 3],
     fixed_speed: Option<f32>,
+    custom_timing: bool,
+    clip_loop: bool,
 }
 #[derive(Component)]
 struct SkinPart(usize);
@@ -73,14 +79,29 @@ pub fn run(
         screenshot,
         sample_frame,
         locomotion_speed,
+        clip_timing,
+        clip_loop,
     } = options;
+    let mut timings = clips
+        .iter()
+        .map(|clip| ClipTiming::configure(&clip.info, 0., -1., -1., 1., false))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    if let Some(timing) = clip_timing {
+        timings[0] = timing;
+    }
+    let start = restart_frame(timings[0]);
     let clip = &clips[0];
     println!(
-        "ANIMATION_LOADED: {} at {} fps, last frame {}; {} skins. Inspection repeats the clip in place; extracted Motion_Root is not applied as gameplay movement.",
+        "ANIMATION_LOADED: {} at {} fps, last frame {}; {} skins. Inspection plays in place; extracted Motion_Root is not applied as gameplay movement.",
         clip.info.name,
         clip.info.frames_per_second,
         clip.info.last_frame(),
         skins.len()
+    );
+    println!(
+        "ANIMATION_TIMING: {}; preview loop {}; custom range pins clip selection and blend mode",
+        serde_json::to_string(&timings[0])?,
+        clip_loop
     );
     let initial = animation_driver::advance_phase(
         0.,
@@ -93,8 +114,8 @@ pub fn run(
         "ANIMATION_LOCOMOTION: RB toggles shared-phase idle/walk/run blend; left stick controls inspection speed up to {}; no actor travel/contact response",
         locomotion.velocities[2]
     );
-    let outcome = App::new().insert_resource(Character { skeletons,skins,clips,fixups,locomotion })
-        .insert_resource(Playback { frame: sample_frame.unwrap_or(0.),clip_index: 0,fixed: sample_frame.is_some(),paused: false,renders: 0,stop_after,screenshot,captured: false,yaw: 0.4,pitch: 0.1,distance: 3.5,tracker: controller::Tracker::default(),settings,locomotion: locomotion_speed.is_some(),phase: 0.,speed: locomotion_speed.unwrap_or(0.),weights: initial.weights,fixed_speed: locomotion_speed })
+    let outcome = App::new().insert_resource(Character { skeletons,skins,clips,timings,fixups,locomotion })
+        .insert_resource(Playback { frame: sample_frame.unwrap_or(start),clip_index: 0,fixed: sample_frame.is_some(),paused: false,renders: 0,stop_after,screenshot,captured: false,yaw: 0.4,pitch: 0.1,distance: 3.5,tracker: controller::Tracker::default(),settings,locomotion: locomotion_speed.is_some(),phase: 0.,speed: locomotion_speed.unwrap_or(0.),weights: initial.weights,fixed_speed: locomotion_speed,custom_timing: clip_timing.is_some(),clip_loop })
         .insert_resource(ClearColor(Color::srgb(0.035,0.045,0.065)))
         .add_plugins(DefaultPlugins.set(WindowPlugin { primary_window: Some(Window { title: "Prototype 2 Rust | Heller animation | A/B clips; RB blend; sticks orbit/zoom; X pause; Y restart; LB slow; Menu exit".into(),resolution: (1280,900).into(),..default() }),..default() }))
         .add_systems(Startup,setup).add_systems(Update,play).run();
@@ -103,6 +124,15 @@ pub fn run(
         "animation viewer exited with an error"
     );
     Ok(())
+}
+// Reverse inspection starts at the range end. This is a preview convention;
+// the retail action supplies initFrame and synchronization separately.
+fn restart_frame(timing: ClipTiming) -> f32 {
+    if timing.speed() < 0. {
+        timing.last_frame()
+    } else {
+        timing.first_frame()
+    }
 }
 fn setup(
     mut commands: Commands,
@@ -178,10 +208,13 @@ fn play(
             state.paused = !state.paused;
         }
         if pad.reset || keys.just_pressed(KeyCode::KeyR) {
-            state.frame = 0.;
+            state.frame = restart_frame(character.timings[state.clip_index]);
             state.phase = 0.;
         }
-        if !state.fixed && (pad.toggle_locomotion || keys.just_pressed(KeyCode::KeyL)) {
+        if !state.fixed
+            && !state.custom_timing
+            && (pad.toggle_locomotion || keys.just_pressed(KeyCode::KeyL))
+        {
             state.locomotion = !state.locomotion;
             state.fixed_speed = None;
             println!(
@@ -193,15 +226,21 @@ fn play(
                 }
             );
         }
-        if !state.fixed && (pad.next_clip || keys.just_pressed(KeyCode::ArrowRight)) {
+        if !state.fixed
+            && !state.custom_timing
+            && (pad.next_clip || keys.just_pressed(KeyCode::ArrowRight))
+        {
             state.clip_index = (state.clip_index + 1) % character.clips.len();
-            state.frame = 0.;
+            state.frame = restart_frame(character.timings[state.clip_index]);
             state.locomotion = false;
         }
-        if !state.fixed && (pad.previous_clip || keys.just_pressed(KeyCode::ArrowLeft)) {
+        if !state.fixed
+            && !state.custom_timing
+            && (pad.previous_clip || keys.just_pressed(KeyCode::ArrowLeft))
+        {
             state.clip_index =
                 (state.clip_index + character.clips.len() - 1) % character.clips.len();
-            state.frame = 0.;
+            state.frame = restart_frame(character.timings[state.clip_index]);
             state.locomotion = false;
         }
         let dt = time.delta_secs().min(0.1);
@@ -239,15 +278,18 @@ fn play(
             state.distance = (state.distance - pad.travel[1] * dt * 2.).clamp(1.5, 8.);
         }
         if !state.locomotion && !state.fixed && !state.paused {
-            let last_frame = character.clips[state.clip_index].info.last_frame();
-            state.frame = if last_frame > 0. {
-                (state.frame
-                    + dt * character.clips[state.clip_index].info.frames_per_second
-                        * if pad.fast { 0.2 } else { 1. })
-                .rem_euclid(last_frame)
-            } else {
-                0.
-            };
+            match character.timings[state.clip_index].advance(
+                state.frame,
+                dt * if pad.fast { 0.2 } else { 1. },
+                state.clip_loop,
+            ) {
+                Ok(frame) => state.frame = frame,
+                Err(e) => {
+                    eprintln!("animation clock failed: {e:#}");
+                    exit.write(AppExit::error());
+                    return;
+                }
+            }
         }
     }
     // CPU inspection removes the animation's Motion_Root transform and retains
@@ -327,10 +369,15 @@ fn play(
             )
         } else {
             format!(
-                "Prototype 2 Rust | {} | frame {:.1}{} | A/B clips; RB blend; sticks orbit/zoom; X pause; Y restart; LB slow; Menu exit",
+                "Prototype 2 Rust | {} | frame {:.1}{} | {}sticks orbit/zoom; X pause; Y restart; LB slow; Menu exit",
                 character.clips[state.clip_index].info.name,
                 state.frame,
-                if state.paused { " paused" } else { "" }
+                if state.paused { " paused" } else { "" },
+                if state.custom_timing {
+                    "cropped clip; "
+                } else {
+                    "A/B clips; RB blend; "
+                }
             )
         };
     }
