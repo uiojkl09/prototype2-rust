@@ -4,6 +4,38 @@ No Prototype 2 movement slice is implemented yet. The free camera has arbitrary
 inspection speed and passes through walls. It must not be presented as recovered
 walking, sprinting, jumping or parkour, even if the viewer looks convincing.
 
+## Located prerequisites in build 19788008
+
+The v0.1.1 investigation inspected the actual character and startup packages. In
+`boot.rcf`, `art\alex\alex_tod.p3d` (30,465 bytes, 103 chunks) contains a metadata
+definition at 0x3afa named AlexPhysicsFactory, type
+`ravenphysics::SimplePhysicsObjectFactory`. Its data child at 0x3b8d contains a
+128-byte body beginning at 0x3b9d, with `CollisionCapsuleFactory` referenced at
+0x3bb3. This identifies a serialized factory lead; its fields and which runtime
+states use that shape are not yet decoded. Nearby floats must not be assumed to
+mean radius/height without a schema or inspected native consumer.
+
+`art\startup_tod.p3d.rz` has a metadata definition at decoded offset 0xbe4bd of type
+`proto::AnalyseCollisionParams`, with a 40-byte body at 0xbe554. Its parameter
+meanings remain unknown. `art\alex\alex.p3d` has a physics object at decimal offset
+9,624,810 named human_ragdoll_HR, with 12 candidate primitive groups; this is a
+ragdoll asset lead, not proof of the locomotion hull. `art\alex\alex_fig.p3d` contains
+a collision_capsule identifier, but its fight-data schema is also unresolved.
+The three inspected initialization Lua files are Lua 5.1 bytecode, not plain text.
+
+The new reader can reproduce the metadata locations without private extraction:
+
+```powershell
+.\prototype2-rust.exe meta --game 'F:\SteamLibrary\steamapps\common\Prototype 2' --archive boot.rcf --entry 'art\alex\alex_tod.p3d' --filter CollisionCapsuleFactory
+.\prototype2-rust.exe meta --game 'F:\SteamLibrary\steamapps\common\Prototype 2' --archive boot.rcf --entry 'art\startup_tod.p3d.rz' --filter AnalyseCollisionParams
+```
+
+Next recover these object/fight schemas and selectively inspect their native
+consumers if necessary. Keep binary bodies/decompiler output private. No movement
+constants or contact rules have been accepted from these references alone. Controller
+input is now available and owner-tested; its dead zones/look speed are inspection
+preferences, separate from the original game's gameplay input response.
+
 ## Exact prerequisites
 
 1. Resolve collision face tags, filtering, transforms and relevant box/convex

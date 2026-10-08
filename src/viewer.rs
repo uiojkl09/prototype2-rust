@@ -2,11 +2,15 @@ use bevy::{
     app::AppExit,
     asset::RenderAssetUsages,
     camera::Exposure,
+    ecs::system::SystemParam,
     mesh::{Indices, PrimitiveTopology},
     prelude::*,
     render::view::screenshot::{Screenshot, save_to_disk},
 };
-use prototype2_rust::scene::{MeshData, Scene, raycast};
+use prototype2_rust::{
+    controller,
+    scene::{MeshData, Scene, raycast},
+};
 use std::path::PathBuf;
 
 #[derive(Resource)]
@@ -22,7 +26,26 @@ struct Session {
 #[derive(Component)]
 struct CollisionOverlay;
 
-pub fn run(world: Scene, frames: Option<u32>, screenshot: Option<PathBuf>) {
+#[derive(Resource, Default)]
+struct Controller {
+    tracker: controller::Tracker,
+    settings: controller::Settings,
+    next_probe: f64,
+}
+
+#[derive(SystemParam)]
+struct InputDevices<'w, 's> {
+    keys: Res<'w, ButtonInput<KeyCode>>,
+    controller: ResMut<'w, Controller>,
+    window: Query<'w, 's, &'static Window, With<bevy::window::PrimaryWindow>>,
+}
+
+pub fn run(
+    world: Scene,
+    frames: Option<u32>,
+    screenshot: Option<PathBuf>,
+    settings: controller::Settings,
+) {
     let low = Vec3::from_array(world.summary.bounds[0]);
     let high = Vec3::from_array(world.summary.bounds[1]);
     let center = (low + high) * 0.5;
@@ -70,6 +93,7 @@ pub fn run(world: Scene, frames: Option<u32>, screenshot: Option<PathBuf>) {
     );
     App::new()
         .insert_resource(WorldData(world))
+        .insert_resource(Controller { tracker: controller::Tracker::default(), settings, next_probe: 0.0 })
         .insert_resource(Session {
             frames: 0,
             stop_after: frames,
@@ -80,7 +104,7 @@ pub fn run(world: Scene, frames: Option<u32>, screenshot: Option<PathBuf>) {
         .insert_resource(ClearColor(Color::srgb(0.025, 0.035, 0.055)))
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "Prototype 2 Rust — real cell geometry; experimental free camera".into(),
+                title: "Prototype 2 Rust — Xbox: sticks move/look; A/B rise/descend; LB fast; X collision; Y reset; Menu exit".into(),
                 resolution: (1600, 900).into(),
                 ..default()
             }),
@@ -166,22 +190,60 @@ fn setup(
     ));
     commands.spawn((Camera3d::default(), Exposure::SUNLIGHT, session.home));
     println!(
-        "VIEWER_READY: {} world meshes, {} ground collision triangles. WASD/QE + arrows; Shift fast; C collision overlay; R reset.",
+        "VIEWER_READY: {} world meshes, {} ground collision triangles. Xbox: left stick move, right stick look, A/B up/down, LB fast, X collision, Y reset, Menu exit. Keyboard: WASD/QE + arrows, Shift fast, C collision, R reset.",
         world.0.summary.world_meshes, world.0.summary.ground_collision_triangles
     );
 }
 fn camera_controls(
-    keys: Res<ButtonInput<KeyCode>>,
+    input: InputDevices,
     time: Res<Time>,
     session: Res<Session>,
     mut camera: Query<&mut Transform, With<Camera3d>>,
     mut overlays: Query<&mut Visibility, With<CollisionOverlay>>,
     mut exit: MessageWriter<AppExit>,
 ) {
-    if keys.just_pressed(KeyCode::Escape) {
+    let InputDevices {
+        keys,
+        mut controller,
+        window,
+    } = input;
+    let focused = window.iter().next().is_some_and(|w| w.focused);
+    let previous_slot = controller.tracker.slot();
+    let settings = controller.settings;
+    // Poll the active pad per frame; probe disconnected slots at most once/second.
+    let mut pads = [None; 4];
+    let active = controller.tracker.slot();
+    if let Some(slot) = active {
+        pads[slot] = controller::poll(slot as u32);
+    }
+    if active.is_none_or(|slot| pads[slot].is_none())
+        && (active.is_some() || time.elapsed_secs_f64() >= controller.next_probe)
+    {
+        pads = controller::connected();
+        controller.next_probe = time.elapsed_secs_f64() + 1.0;
+    }
+    let pad = controller.tracker.sample(pads, focused, settings);
+    if controller.tracker.slot() != previous_slot {
+        match controller.tracker.slot() {
+            Some(slot) => println!(
+                "CONTROLLER_CONNECTED: Xbox/XInput slot {slot}; dead zones {:.3}/{:.3}; look {:.2} rad/s; invert Y {}",
+                settings.left_dead_zone,
+                settings.right_dead_zone,
+                settings.look_speed,
+                settings.invert_y
+            ),
+            None => {
+                println!("CONTROLLER_DISCONNECTED: input cleared; reconnect an Xbox controller")
+            }
+        }
+    }
+    if !focused {
+        return;
+    }
+    if keys.just_pressed(KeyCode::Escape) || pad.exit {
         exit.write(AppExit::Success);
     }
-    if keys.just_pressed(KeyCode::KeyC) {
+    if keys.just_pressed(KeyCode::KeyC) || pad.toggle_collision {
         for mut v in &mut overlays {
             *v = if *v == Visibility::Hidden {
                 Visibility::Visible
@@ -191,24 +253,25 @@ fn camera_controls(
         }
     }
     for mut t in &mut camera {
-        if keys.just_pressed(KeyCode::KeyR) {
+        if keys.just_pressed(KeyCode::KeyR) || pad.reset {
             *t = session.home;
         }
         let axis = |p, n| f32::from(keys.pressed(p)) - f32::from(keys.pressed(n));
         let dt = time.delta_secs().min(0.1);
-        let yaw = axis(KeyCode::ArrowLeft, KeyCode::ArrowRight) * dt;
-        let pitch = axis(KeyCode::ArrowUp, KeyCode::ArrowDown) * dt;
-        t.rotate_y(yaw);
-        t.rotate_local_x(pitch);
-        let direction = t.forward() * axis(KeyCode::KeyW, KeyCode::KeyS)
-            + t.right() * axis(KeyCode::KeyD, KeyCode::KeyA)
-            + Vec3::Y * axis(KeyCode::KeyE, KeyCode::KeyQ);
-        let speed = if keys.pressed(KeyCode::ShiftLeft) {
+        let (mut yaw, mut pitch, _) = t.rotation.to_euler(EulerRot::YXZ);
+        yaw += (axis(KeyCode::ArrowLeft, KeyCode::ArrowRight) + pad.look[0]) * dt;
+        pitch = (pitch + (axis(KeyCode::ArrowUp, KeyCode::ArrowDown) + pad.look[1]) * dt)
+            .clamp(-1.48, 1.48);
+        t.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
+        let direction = t.forward() * (axis(KeyCode::KeyW, KeyCode::KeyS) + pad.travel[1])
+            + t.right() * (axis(KeyCode::KeyD, KeyCode::KeyA) + pad.travel[0])
+            + Vec3::Y * (axis(KeyCode::KeyE, KeyCode::KeyQ) + pad.travel[2]);
+        let speed = if keys.pressed(KeyCode::ShiftLeft) || pad.fast {
             100.0
         } else {
             25.0
         };
-        t.translation += direction.normalize_or_zero() * dt * speed;
+        t.translation += direction.clamp_length_max(1.0) * dt * speed;
     }
 }
 fn capture_and_exit(

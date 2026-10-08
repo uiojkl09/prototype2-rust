@@ -12,7 +12,7 @@ try {
     & cargo fmt --all --check
     if ($LASTEXITCODE -ne 0) { throw 'Formatting check failed' }
     & cargo test --locked --no-default-features
-    if ($LASTEXITCODE -ne 0) { throw 'Reader/collision tests failed' }
+    if ($LASTEXITCODE -ne 0) { throw 'Reader/collision/controller tests failed' }
     $featureArguments = @()
     if ($CoreOnly) { $featureArguments = @('--no-default-features') }
     & cargo clippy --locked --all-targets @featureArguments -- -D warnings

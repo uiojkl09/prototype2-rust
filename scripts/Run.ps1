@@ -2,7 +2,10 @@
 param(
     [string]$GameDirectory = $env:PROTOTYPE2_GAME,
     [string]$Entry = 'art\locations\yellow_zone\Cell_29.p3d.rz',
-    [string]$LogDirectory
+    [string]$LogDirectory,
+    [string]$DeadZone,
+    [double]$LookSpeed = 2.0,
+    [switch]$InvertY
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -19,5 +22,9 @@ if (-not $LogDirectory) { $LogDirectory = Join-Path $env:LOCALAPPDATA 'prototype
 $null = New-Item -ItemType Directory -Path $LogDirectory -Force
 $logPath = Join-Path $LogDirectory ('viewer-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
 Write-Host "Diagnostic log: $logPath"
-& $binary view --game $GameDirectory --entry $Entry 2>&1 | Tee-Object -FilePath $logPath
+$viewerArguments = @('view', '--game', $GameDirectory, '--entry', $Entry,
+    '--look-speed', $LookSpeed.ToString([Globalization.CultureInfo]::InvariantCulture),
+    '--invert-y', $InvertY.IsPresent.ToString().ToLowerInvariant())
+if ($DeadZone) { $viewerArguments += @('--dead-zone', $DeadZone) }
+& $binary @viewerArguments 2>&1 | Tee-Object -FilePath $logPath
 if ($LASTEXITCODE -ne 0) { throw "Viewer failed; see $logPath" }

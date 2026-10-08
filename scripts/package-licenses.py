@@ -1,8 +1,12 @@
 """Collect resolved crates' distributed notices for the binary package; never read game data."""
-import hashlib, json, pathlib, shutil, sys, urllib.request, urllib.error, urllib.parse
+import hashlib, json, pathlib, shutil, subprocess, sys, urllib.request, urllib.error, urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 
-metadata = json.load(sys.stdin)
+# Read Cargo's UTF-8 JSON directly; Windows PowerShell pipes can alter native bytes.
+metadata = json.loads(subprocess.check_output([
+    'cargo', 'metadata', '--locked', '--format-version', '1',
+    '--filter-platform', 'x86_64-pc-windows-msvc',
+]))
 resolved_ids = {node['id'] for node in metadata['resolve']['nodes']}
 out = pathlib.Path(sys.argv[1]) / 'dependency-licenses'
 out.mkdir()

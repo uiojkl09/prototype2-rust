@@ -94,3 +94,19 @@ installed as world collision without recovered transforms.
 not implement the original collision filter, swept player hull, step-up, wall slide,
 grounding or parkour contacts. Rendering triangles and obtaining a ray hit are
 evidence of geometry recovery, not proof of correct character collision.
+
+## Metadata envelopes — checked; body schemas unknown
+
+Chunk 0x07f00000 has three aligned u8-length strings (long, short and type name),
+two u16 fields and one u32 field. The numeric field meanings remain unknown; the
+u32 may identify the schema/type but is not treated as a proven hash contract.
+Its direct child 0x07f00001 has a u32 length followed by exactly that many bytes.
+Inspected bodies begin with `META`; the reader reports this signature without
+assuming every body has it. These envelope layouts were informed by Gibbed's
+MetaObjectDefinition/MetaObjectData and checked against actual character/startup
+entries. Header and body lengths must consume their complete payloads.
+
+The `meta` command searches names and bounded ASCII references in opaque bodies,
+returning absolute decoded-P3D offsets and sizes. It does not export bodies or infer
+the meaning of nearby numeric values. It also works in files without merged geometry.
+Character collision-related locations and remaining schema work are in MOVEMENT.md.

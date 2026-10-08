@@ -14,6 +14,10 @@ format/research/validation notes; do not repeat the archive investigation.
 - Real merged geometry: default yellow-zone Cell_29, 38 meshes, 185,586 triangles.
 - Ground triangle decoding: 20,075 faces; geometric probes and optional visual overlay.
 - Native viewer, free flight, bounded inspection commands and screenshot smoke tests.
+- Native Xbox/XInput viewer controls, analog speed/dead zones, preferences, focus
+  handling and connection changes; owner reported working controls and no drift.
+- Checked metadata-envelope/reference inspector locating a collision-capsule factory
+  in the character package; its parameter schema and retail semantics remain unknown.
 - Synthetic parser/query tests and opt-in retail-data test.
 
 ## Incomplete / unknown
@@ -26,7 +30,8 @@ format/research/validation notes; do not repeat the archive investigation.
   progression, AI and audio. No faithful movement slice or original-game comparison.
 - Retail timing, numerical constants and native routines. Ghidra has not been run.
 - Windows 10, 4K performance, other CPU configurations and long-run compatibility.
-- Interactive playtest by the owner. Automated capture is not an input/playtest result.
+- Interactive 4K/resizing/long-run playtest; controller input has been owner-tested,
+  but automated capture alone is not a full playtest result.
 
 ## Requested milestone accounting
 
@@ -41,11 +46,13 @@ format/research/validation notes; do not repeat the archive investigation.
 
 ## Next work, in order
 
-1. Owner viewer playtest using docs/PLAYTEST.md. Retain diagnostics outside source.
+1. Continue viewer compatibility checks using docs/PLAYTEST.md and docs/CONTROLLER.md.
+   Basic owner controller playtest passed; retain diagnostics outside source.
 2. Choose a simple reachable patch in the original game and relate it to a loaded
    cell's coordinates. Avoid claiming a location from asset names alone.
-3. Decode/filter collision and player hull/contact semantics. Use selective native
-   analysis where measurements/file structures cannot answer a specific rule.
+3. Decode the located character META/fight schemas, collision filtering and player
+   hull/contact semantics. Exact offsets and queries are in docs/MOVEMENT.md. Use
+   selective native analysis where file structures cannot answer a specific rule.
 4. Recover scene instance/material references, then textures and simple props.
 5. Implement an explicit simulation step and initial walking slice from measured
    original behavior. Follow docs/MOVEMENT.md; do not use viewer speed as gameplay.

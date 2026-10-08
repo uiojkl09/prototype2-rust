@@ -23,6 +23,7 @@ record for these tested files. The new executable targets x64 MSVC independently
 | Check | Observed result | What it establishes |
 | --- | --- | --- |
 | Seven synthetic tests | Passed | Malformed/truncated/nested P3D, RZ size/checksum/trailer/cap, RCF name/range/alignment rejection and geometric nearest-ray behavior |
+| v0.1.1 controller/metadata tests | Five additional tests passed (12 synthetic total) | Analog stick/dead-zone behavior, button edges, focus/disconnect/reconnect/multiple pads/inversion; metadata reference offsets and malformed envelope lengths |
 | All RCF indexes | 12 archives; 26,385 entries passed | Metadata, hash joins, bounds, alignment, uniqueness and non-overlap |
 | Full cells.rcf scan | 2,969 P3D files; 551,832,928 stored bytes; 1,219,150,189 decoded bytes; 811,757 chunks | Every selected archive payload decoded; complete structural traversal passed |
 | Scan timing | 29.403 seconds in an unoptimized core build | A single local scan measurement, not runtime performance |
@@ -32,6 +33,18 @@ record for these tested files. The new executable targets x64 MSVC independently
 | Additional section summaries | green_zone/Cell_18: 24 meshes, 74,244 triangles; yellow_zone/Cell_49: 33 meshes, 74,949 triangles | Limited merged-buffer decoder works on additional real cells; these are not fully assembled scenes |
 | Native viewer | Ran, captured frames and exited successfully | Real meshes reached the GPU/window and produced nonempty frames |
 | Formatting / Clippy | Passed with warnings denied | Source hygiene checks for all compiled targets; not semantic correctness |
+
+Controller update: the native Windows API detected an Xbox/XInput device in slot 0.
+Its neutral raw readings (-232,159) / (909,129) yielded zero processed travel/look.
+The viewer logged the connection, and the owner reported that the listed controller
+controls work with no drift. Physical disconnection/focus and other device/transport
+combinations remain separate playtest checks; automated state-transition tests pass.
+The metadata inspector reproduced the two character/startup leads in MOVEMENT.md.
+
+The v0.1.0 hosted CI build/check step passed, but its packaging step failed while
+loading Cargo JSON passed through PowerShell. v0.1.1 reads that metadata directly
+from Cargo in Python, avoiding the native text pipe. Local packaging is checked;
+consult GitHub Actions for the current hosted packaging result.
 
 The viewer was checked with local screenshots, which remain outside the public
 repository/package. Screenshots reveal plain debug geometry and omitted dressing;

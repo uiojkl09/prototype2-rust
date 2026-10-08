@@ -32,5 +32,12 @@ The viewer never calls retail DLL functions. It reads and presents data itself.
 Its camera advances using presentation delta time; that is a viewer convenience and
 must not be reused as the character simulation clock. No retail tick rate is assumed.
 
+The renderer-independent `controller` module reads documented Windows XInput samples
+and converts them into inspection actions. The viewer combines those with optional
+keyboard input, preserves analog magnitude, gates input on focus and probes inactive
+controller slots periodically. This backend needs no Bevy gamepad plugin/dependency.
+Gameplay input mapping/timing must be recovered separately. The `meta` reader exposes
+checked object envelopes/reference offsets, leaving unknown body schemas opaque.
+
 The design was informed by [IW4L's asset-loading separation](https://github.com/vladtrc/iw4L/blob/a2f4e0b8573eeb828001f8ee757b5b724eee196f/docs/MAP-LOAD.md)
 and explicit simulation input/time. None of its game-specific engine code is reused.

@@ -22,9 +22,14 @@ writable directory, and open PowerShell there:
 .\prototype2-rust.exe view --game 'F:\SteamLibrary\steamapps\common\Prototype 2'
 ```
 
-Use WASD to fly, Q/E to move vertically, arrow keys to look, and left Shift for faster
-flight. C toggles the orange collision overlay, R resets the inspection camera, and
-Escape exits. This camera passes through walls. Debug colors replace retail materials.
+**Xbox controller:** left stick to move, right stick to look, A/B to rise/descend,
+LB for faster flight, X for the orange collision overlay, Y to reset, and Menu/Start
+to exit. Native Windows XInput works without a keyboard mapper. Analog speed,
+stick dead zones, connection changes and window focus are handled. See
+[controller preferences and checks](docs/CONTROLLER.md).
+
+Keyboard remains available: WASD, Q/E, arrows, Shift; C collision, R reset, Escape exit.
+This camera passes through walls. Debug colors replace retail materials.
 
 To retain a diagnostic log, use the packaged script:
 
@@ -60,9 +65,11 @@ All commands accept `--game`, or the `PROTOTYPE2_GAME` environment variable.
 | `scan --archive cells.rcf` | Decode every P3D entry and validate its full chunk tree |
 | `list --filter Cell_29 --limit 20` | Matching entries, offsets and stored sizes |
 | `chunks --limit 30` | Bounded structural listing and chunk-ID histogram |
+| `meta --filter CollisionCapsuleFactory` | Checked metadata envelopes and reference offsets; body schemas remain unknown |
 | `scene` | Selected cell's geometry/collision counts, bounds and limitations |
 | `ray --origin 1266,80,-1932 --direction 0,-1,0` | Experimental geometric collision query |
 | `view` | Standalone Bevy viewer of the selected cell |
+| `controller --seconds 15` | Xbox/XInput raw and processed input diagnostics; no game path required |
 
 Use `--archive` and `--entry` to select a different file. Empty cells and unsupported
 scene layouts produce errors. Reader support is broader than scene interpretation.

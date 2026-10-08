@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail, ensure};
-use prototype2_rust::{install, p3d, rcf::Archive, scene};
+use prototype2_rust::{controller, install, meta, p3d, rcf::Archive, scene};
 use std::{collections::BTreeMap, path::PathBuf};
 #[cfg(feature = "viewer")]
 mod viewer;
@@ -40,7 +40,11 @@ fn run() -> Result<()> {
                 "--frames",
                 "--screenshot",
                 "--origin",
-                "--direction"
+                "--direction",
+                "--seconds",
+                "--dead-zone",
+                "--look-speed",
+                "--invert-y"
             ]
             .contains(&key.as_str()),
             "unknown option {key}"
@@ -59,9 +63,20 @@ fn run() -> Result<()> {
         "scan" => &["--game", "--archive"],
         "list" => &["--game", "--archive", "--filter", "--limit"],
         "chunks" => &["--game", "--archive", "--entry", "--limit"],
+        "meta" => &["--game", "--archive", "--entry", "--filter", "--limit"],
         "scene" => &["--game", "--archive", "--entry"],
         "ray" => &["--game", "--archive", "--entry", "--origin", "--direction"],
-        "view" => &["--game", "--archive", "--entry", "--frames", "--screenshot"],
+        "view" => &[
+            "--game",
+            "--archive",
+            "--entry",
+            "--frames",
+            "--screenshot",
+            "--dead-zone",
+            "--look-speed",
+            "--invert-y",
+        ],
+        "controller" => &["--seconds", "--dead-zone", "--look-speed", "--invert-y"],
         _ => bail!("unknown command {command}; use --help"),
     };
     for key in options.keys() {
@@ -69,6 +84,51 @@ fn run() -> Result<()> {
             allowed.contains(&key.as_str()),
             "{key} is not valid for {command}"
         );
+    }
+    let mut settings = controller::Settings::default();
+    if let Some(value) = options.get("--dead-zone") {
+        settings.left_dead_zone = value.parse()?;
+        settings.right_dead_zone = settings.left_dead_zone;
+    }
+    if let Some(value) = options.get("--look-speed") {
+        settings.look_speed = value.parse()?;
+    }
+    if let Some(value) = options.get("--invert-y") {
+        settings.invert_y = value.parse()?;
+    }
+    ensure!(
+        settings.valid(),
+        "dead zone must be 0..0.9; look speed must be 0.1..10 radians/second; values must be finite"
+    );
+    if command == "controller" {
+        ensure!(
+            cfg!(target_os = "windows"),
+            "native XInput is supported on Windows only"
+        );
+        let seconds: u32 = options
+            .get("--seconds")
+            .map(|s| s.parse())
+            .transpose()?
+            .unwrap_or(0);
+        ensure!(seconds <= 60, "--seconds must be 0..60");
+        let started = std::time::Instant::now();
+        let mut tracker = controller::Tracker::default();
+        println!(
+            "Xbox/XInput diagnostics; slots 0..3; controls below are inspection controls, not recovered gameplay"
+        );
+        loop {
+            let slots = controller::connected();
+            let controls = tracker.sample(slots, true, settings);
+            println!(
+                "{}",
+                serde_json::json!({"elapsed_seconds": started.elapsed().as_secs_f32(), "selected_slot": tracker.slot(), "raw_slots": slots, "controls": controls})
+            );
+            if started.elapsed().as_secs_f32() >= seconds as f32 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        return Ok(());
     }
     let game = options
         .get("--game")
@@ -205,6 +265,23 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
+    if command == "meta" {
+        let objects = meta::inspect(
+            &data,
+            &chunks,
+            options.get("--filter").map(String::as_str).unwrap_or(""),
+        )?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&objects.iter().take(limit).collect::<Vec<_>>())?
+        );
+        println!(
+            "{} matched metadata envelopes; showing {}. Bodies remain opaque; no property values or gameplay rules inferred.",
+            objects.len(),
+            objects.len().min(limit)
+        );
+        return Ok(());
+    }
     let world = scene::load(&data, &chunks)?;
     println!("{}", serde_json::to_string_pretty(&world.summary)?);
     if command == "scene" {
@@ -257,6 +334,7 @@ fn run() -> Result<()> {
             world,
             frames,
             options.get("--screenshot").map(PathBuf::from),
+            settings,
         );
         Ok(())
     }
@@ -265,6 +343,21 @@ fn run() -> Result<()> {
 }
 fn help() {
     println!(
-        "prototype2-rust: experimental retail-data viewer, NOT a playable reimplementation\n\nCommands: inspect | verify | scan | list | chunks | scene | ray | view\nRequired: --game <Prototype 2 install directory> (or PROTOTYPE2_GAME)\nSelection: --archive cells.rcf --entry <internal path>\nlist: --filter <substring> --limit 40\nchunks: --limit 40\nray: --origin x,y,z --direction x,y,z\nview: --frames <at least 30> --screenshot <PNG path outside repository>\n\nDefault section: yellow_zone/Cell_29. Viewer: WASD, Q/E, arrows, Shift; C collision overlay; R reset; Escape exit.\nUnknown collision tags and retail character movement remain unimplemented."
+        "prototype2-rust: experimental retail-data viewer, NOT a playable reimplementation
+
+Commands: inspect | verify | scan | list | chunks | meta | scene | ray | view | controller
+Game commands require --game <Prototype 2 install directory> (or PROTOTYPE2_GAME)
+Selection: --archive cells.rcf --entry <internal path>
+list: --filter <substring> --limit 40
+chunks: --limit 40
+meta: --filter <ASCII name or body reference> --limit 40
+ray: --origin x,y,z --direction x,y,z
+view: --frames <at least 30> --screenshot <PNG path outside repository>
+controller: --seconds <0..60> (no game installation needed)
+view/controller preferences: --dead-zone <0..0.9> --look-speed <0.1..10 rad/s> --invert-y <true|false>
+
+Xbox viewer: left stick move; right stick look; A/B up/down; LB fast; X collision; Y reset; Menu exit.
+Keyboard: WASD, Q/E, arrows, Shift; C collision overlay; R reset; Escape exit.
+Default section: yellow_zone/Cell_29. Unknown collision tags and retail character movement remain unimplemented."
     );
 }

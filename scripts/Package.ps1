@@ -24,9 +24,7 @@ try {
     $sourceArchive = Join-Path $packageRoot 'source.zip'
     & git archive --format=zip -o $sourceArchive HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
-    $metadata = & cargo metadata --locked --format-version 1 --filter-platform x86_64-pc-windows-msvc
-    if ($LASTEXITCODE -ne 0) { throw 'Dependency metadata failed' }
-    $metadata | & python (Join-Path $PSScriptRoot 'package-licenses.py') $packageRoot
+    & python (Join-Path $PSScriptRoot 'package-licenses.py') $packageRoot
     if ($LASTEXITCODE -ne 0) { throw 'Dependency notice collection failed' }
     $buildInfo = @("source_commit=$commit", (& rustc -V), (& cargo -V), 'target=x86_64-pc-windows-msvc')
     $buildInfo | Set-Content -LiteralPath (Join-Path $packageRoot 'BUILD-INFO.txt') -Encoding UTF8

@@ -1,5 +1,5 @@
 //! Opt-in tests: retail data is read in place and never becomes a fixture.
-use prototype2_rust::{p3d, rcf::Archive, scene};
+use prototype2_rust::{meta, p3d, rcf::Archive, scene};
 #[test]
 #[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
 fn installed_cell_decodes_and_references_real_ground_collision() {
@@ -32,4 +32,25 @@ fn installed_cell_decodes_and_references_real_ground_collision() {
     assert!(hits > 0, "no downward ray hit in section bounds");
     println!("{}", serde_json::to_string_pretty(&s.summary).unwrap());
     println!("{hits}/81 downward sample rays hit geometric ground triangles");
+}
+
+#[test]
+#[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
+fn installed_character_metadata_locates_capsule_reference() {
+    let game = std::path::PathBuf::from(
+        std::env::var_os("PROTOTYPE2_GAME").expect("PROTOTYPE2_GAME is required"),
+    );
+    let archive = Archive::open(game.join("boot.rcf")).unwrap();
+    let raw = archive
+        .read(archive.find("art\\alex\\alex_tod.p3d").unwrap())
+        .unwrap();
+    let data = p3d::decode(&raw).unwrap();
+    let chunks = p3d::parse(&data).unwrap();
+    let objects = meta::inspect(&data, &chunks, "CollisionCapsuleFactory").unwrap();
+    assert_eq!(objects.len(), 1);
+    assert_eq!(objects[0].short_name, "AlexPhysicsFactory");
+    assert_eq!(objects[0].body_bytes, 128);
+    assert!(objects[0].has_meta_signature);
+    assert_eq!(objects[0].matched_reference_offsets, [0x3bb3]);
+    println!("{}", serde_json::to_string_pretty(&objects).unwrap());
 }

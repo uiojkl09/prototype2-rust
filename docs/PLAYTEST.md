@@ -12,12 +12,16 @@ extracted data, executable copies, dumps or full installation manifests.
    expect 2,969 P3D files and 811,757 structurally valid chunks.
 3. Run `scene`. The default entry should report 38 meshes, 177,596 vertices and
    185,586 triangles; 60 ground collision chunks and 20,075 collision triangles.
-4. Run `view`. Expect an untextured interior section in debug colors. Use arrows
-   and WASD/QE to inspect walls/floors/roof from different viewpoints. The camera
+4. Run `view`. Expect an untextured interior section in debug colors. Use an Xbox
+   controller's sticks and A/B to inspect walls/floors/roof. The camera
    starts using bounds and geometric ray probes; it is not a recovered spawn.
-5. Press C. Orange surfaces should show the loaded ground collision. Compare
+5. Press X on the controller (C on keyboard). Orange surfaces show ground collision. Compare
    alignment with visible walls and floors. Some omissions are expected; report
-   specific surfaces, location and direction. R resets the camera. Escape exits.
+   specific surfaces, location and direction. Y resets; Menu/Start exits.
+   Test gentle/full stick deflection and release: speed should be proportional,
+   with no idle drift. Hold X/Y and confirm only one action per press. Disconnect/
+   reconnect and switch window focus; background input must not move the viewer.
+   Details and preferences are in CONTROLLER.md. Keyboard remains available.
 6. Repeat launching/exiting three times and resizing/maximizing the window. Report
    crashes, empty frames or severe stalls. Check your desired 4K/full-screen-sized
    view separately; the default is a 1600x900 logical-pixel window.

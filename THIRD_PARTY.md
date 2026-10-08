@@ -9,7 +9,9 @@ Rust implementation, not the original Gibbed or RcfTools implementation.
 
 [Rick / Gibbed.Prototype](https://github.com/gibbed/Gibbed.Prototype/tree/026da397342c4f8a43af575232dccf4b104df2e5),
 revision 026da397342c4f8a43af575232dccf4b104df2e5. RCF fields, filename hashing,
-metadata, RZ envelope and Pure3D chunk hierarchy informed the native readers.
+metadata, RZ envelope, Pure3D chunk hierarchy and metadata-object envelopes informed
+the native readers. The new Rust metadata inspector is independently implemented;
+unknown serialized object bodies are not reinterpreted as recovered gameplay.
 Its permissive source notice is preserved here conservatively for this lineage:
 
 > Copyright (c) 2012 Rick (rick 'at' gibbed 'dot' us)
