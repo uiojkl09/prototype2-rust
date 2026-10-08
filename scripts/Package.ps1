@@ -21,7 +21,8 @@ try {
     $scriptOutput = Join-Path $packageRoot 'scripts'
     $null = New-Item -ItemType Directory -Path $scriptOutput
     Copy-Item -LiteralPath 'scripts\Run.ps1' -Destination $scriptOutput
-    & git archive --format=zip --output=(Join-Path $packageRoot 'source.zip') HEAD
+    $sourceArchive = Join-Path $packageRoot 'source.zip'
+    & git archive --format=zip -o $sourceArchive HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
     $metadata = & cargo metadata --locked --format-version 1
     if ($LASTEXITCODE -ne 0) { throw 'Dependency metadata failed' }
