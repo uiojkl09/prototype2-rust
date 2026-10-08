@@ -25,6 +25,7 @@ fn installed_animation_actions_preserve_cropped_frames_and_exact_reference_limit
     let mut joined = 0;
     let mut unresolved = 0;
     let mut referenced_branches = 0;
+    let mut cycle_counts = [0usize; 7];
     for graph in &graphs {
         for record in &graph.records {
             let Some(track) = &record.animation else {
@@ -33,6 +34,14 @@ fn installed_animation_actions_preserve_cropped_frames_and_exact_reference_limit
             actions += 1;
             assert_eq!(record.type_hash, fight::name_hash("animation"));
             assert_eq!(track.random_speed_variation, 0.);
+            let cycle =
+                prototype2_rust::animation_policy::CyclePolicy::from_hash(track.cyclic).unwrap();
+            cycle_counts[usize::from(cycle.native_index())] += 1;
+            assert_eq!(
+                prototype2_rust::animation_policy::SyncPhasePolicy::from_hash(track.sync_phase)
+                    .unwrap(),
+                prototype2_rust::animation_policy::SyncPhasePolicy::Legacy
+            );
             assert_eq!(track.sync_phase, 3349652082457766725);
             if !track.synch_tracks_branch.name.is_empty() {
                 referenced_branches += 1;
@@ -70,6 +79,7 @@ fn installed_animation_actions_preserve_cropped_frames_and_exact_reference_limit
         (actions, joined, unresolved, referenced_branches),
         (549, 398, 151, 10)
     );
+    assert_eq!(cycle_counts, [399, 37, 67, 46, 0, 0, 0]);
     let graph = graphs.iter().find(|g| g.name == "prototype_air").unwrap();
     let record = graph.records.iter().find(|r| r.offset == 0x87601).unwrap();
     assert_eq!(record.body_bytes, 172);

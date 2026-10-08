@@ -81,6 +81,19 @@ impl ClipTiming {
     pub fn speed(self) -> f32 {
         self.speed
     }
+    /// The skeletal completion refresh suppresses completion for cyclic/hold
+    /// drivers; otherwise it compares the current frame with the directional end.
+    /// This is not action removal, graph completion or an event dispatch.
+    pub fn finished(self, frame: f32, cyclic: bool, hold_end_frame: bool) -> Result<bool> {
+        ensure!(frame.is_finite(), "invalid animation completion frame");
+        Ok(!cyclic
+            && !hold_end_frame
+            && if self.speed < 0. {
+                frame <= self.first_frame
+            } else {
+                frame >= self.last_frame
+            })
+    }
     /// None represents the native -1 sentinel for near-zero speed or fps.
     pub fn cycle_seconds(self) -> Result<Option<f32>> {
         if self.speed.abs() <= EPSILON || self.frames_per_second.abs() <= EPSILON {

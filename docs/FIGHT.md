@@ -112,7 +112,7 @@ After the reference-index/slave prefix, the ordered fields are:
 | animation | u64 clip-name hash |
 | speed, randomSpeedVariation | f32 pair |
 | initFrame, startFrame, endFrame | three f32 values |
-| cyclic | u64 enum-name hash, retained without interpreting its policy |
+| cyclic | u64 enum-name hash, retained alongside optional checked policy-name conversion |
 | syncFrame, phaseMatch | checked 0/1 u32 pair |
 | syncPhase | u64 enum-name hash, retained without executing synchronization |
 | syncPhaseMinFrame, syncPhaseMaxFrame | f32 pair |
@@ -129,7 +129,8 @@ Ten have a nonempty external branch reference and **172 bytes**. Readers check
 complete payloads, finite floats, boolean widths, bounded UTF-8/padding and reference
 indices. Negative frame/time/speed/blend values remain authored values; the reader
 does not replace them with a guessed sentinel interpretation. Enum and partition
-hashes remain explicit unresolved policy/reference fields.
+hashes remain explicit fields; the inspected enum names resolve as described below,
+while partition references and broader synchronization behavior remain unresolved.
 
 Exact name-hash matching against the 931 headers in `alex.p3d` resolves **398**
 action records. **151** have no matching clip in that package; these references
@@ -155,9 +156,48 @@ driver reuse, synchronization, component selection, cropping, blend/event and ro
 policies. These consumers are research leads, not implemented state execution.
 The isolated skeletal driver's cropped range/speed/frame math now exists in
 `animation_clock.rs` and the preview renderer; see ANIMATION.md. It does not resolve
-the action's initFrame, sync or cyclic policies or schedule these records.
+the action's initFrame or synchronize/schedule these records. The enum-name and
+standalone flag/completion helpers below do not execute the action lifecycle.
 Action clock, conditions/priority, event order, partitions/additive layers and actor
 integration remain necessary before these configurations can drive gameplay.
+
+## Animation cycle and phase policies
+
+Native static initialization fragments at **0x109bc850 / 0x109bc910**, corroborated
+by their initializer-table entries **0x109e61c4 / 0x109e61c8**, assign seven cycle
+and two sync-phase name hashes in order. Property registration **0x1034b2c0** binds
+those tables and counts. Enum loader **0x10677250** matches a stored two-word hash
+against table entries and sends its index to the setter; **0x1032f930 / 0x1029f8b0 /
+0x102b60f0** corroborate lookup/count/set dispatch. Cycle setter **0x1034afa0** packs
+bits 0..2; sync setter **0x1034b000** packs bits 3..4.
+
+| Cycle index | Original label | Observed records |
+| --- | --- | --- |
+| 0 | From Animation | 399 |
+| 1 | Not Cyclic | 37 |
+| 2 | Cyclic | 67 |
+| 3 | Hold End Frame | 46 |
+| 4 | Not Cyclic - Backward | 0 |
+| 5 | Cyclic - Backward | 0 |
+| 6 | End Early For Time Slicing | 0 |
+
+Sync-phase indices are 0 **Legacy**, 1 **From Puppet Phase**. All 549 inspected
+records use Legacy. `animation_policy.rs` provides checked exact hash-to-policy
+conversion and retains native index/label identity. Unknown conversions fail with
+the raw hash; the format reader still preserves authored hashes. `fight` displays
+known labels and explicitly marks unknown ones unresolved.
+
+The inspected skeletal begin path **0x10348950** enables cyclic state for indices
+2/5 or index 0 with the clip's cyclic flag. Only index 3 enables hold-end state.
+These flags are applied after range/speed setup. `driver_flags` implements this
+subset; it does not infer speed sign from a backward label or execute time slicing.
+
+Completion refresh **0x10623da0** stays incomplete for cyclic or hold-end drivers.
+Otherwise negative speed completes at/below the cropped first frame, and
+nonnegative speed completes at/above its last frame. `ClipTiming::finished`
+implements this explicit frame/flags check; nonfinite input fails. This does not
+remove a driver, emit events, finish a graph branch or reproduce lifecycle order.
+Action update **0x10349660** additionally depends on component/pass/sync state.
 
 ## Capsule state changes
 

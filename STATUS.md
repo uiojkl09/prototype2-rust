@@ -56,11 +56,13 @@ format/research/validation notes; do not repeat the archive investigation.
 - Checked original animation action properties: 549 records with frame ranges,
   speed/blend timing, partitions, synchronization references and root flags.
   `fight` displays them; 398 clip references join this character package exactly,
-  while 151 remain unresolved. Enum policies and the scheduler are not executed.
+  while 151 remain unresolved. Enum names, isolated loop/hold flags and directional
+  completion are recovered; the scheduler and broader mode behavior are not executed.
 - Checked cropped single-clip driver math now reaches the preview renderer:
   count-relative end frames, clamped ranges, signed speed, duration fitting and
   explicit clamp/loop mapping. Custom inspection ranges pin selection/blending.
-  The state machine's init/sync/cyclic/event policies remain separate work.
+  The state machine's init/sync/event and backward/time-slicing behavior remain
+  separate work. `fight` also displays resolved cycle/sync policy names.
 
 ## Incomplete / unknown
 
@@ -98,7 +100,8 @@ format/research/validation notes; do not repeat the archive investigation.
    transitions, blending and the root-motion driver, then connect them to state.
    The 549 ordinary animation records now decode; use their retained timing/frame
    properties and cropped driver math rather than treating preview loops as action
-   playback. Recover init/sync/cyclic policies and transitions next.
+   playback. Recover init/sync, backward/time-slicing behavior and transition/
+   completion lifecycle next.
 2. Continue from docs/FIGHT.md: graph serialization and selected LocoSteer/capsule
    schemas are implemented. Resolve conditions/references, sprint/jump drivers and
    action scheduling. Recover active hull/transforms, filtering and contact response

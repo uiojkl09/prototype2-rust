@@ -620,6 +620,12 @@ fn run() -> Result<()> {
                     "{}",
                     serde_json::to_string_pretty(&serde_json::json!({
                         "branch": graph.branches[record.branch].derived_path, "record": record,
+                        "animation_policies": record.animation.as_ref().map(|track| serde_json::json!({
+                            "cycle": prototype2_rust::animation_policy::CyclePolicy::from_hash(track.cyclic)
+                                .map(|p| p.label()).unwrap_or("unresolved"),
+                            "sync_phase": prototype2_rust::animation_policy::SyncPhasePolicy::from_hash(track.sync_phase)
+                                .map(|p| p.label()).unwrap_or("unresolved"),
+                        })),
                     }))?
                 );
             }

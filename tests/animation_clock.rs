@@ -86,6 +86,28 @@ fn signed_steps_clamp_or_wrap_only_inside_the_cropped_range() {
     assert_eq!(held.advance(0., 10., true).unwrap(), 0.);
 }
 #[test]
+fn completion_respects_direction_cyclic_and_hold_end_flags() {
+    let forward = timing(40., 80., 1.);
+    assert!(!forward.finished(79.9, false, false).unwrap());
+    assert!(forward.finished(80., false, false).unwrap());
+    assert!(forward.finished(81., false, false).unwrap());
+    let reverse = timing(40., 80., -1.);
+    assert!(!reverse.finished(40.1, false, false).unwrap());
+    assert!(reverse.finished(40., false, false).unwrap());
+    assert!(reverse.finished(39., false, false).unwrap());
+    for (t, end) in [(forward, 80.), (reverse, 40.)] {
+        for flags in [(true, false), (false, true), (true, true)] {
+            assert!(!t.finished(end, flags.0, flags.1).unwrap());
+        }
+        assert!(t.finished(f32::NAN, false, false).is_err());
+        assert!(t.finished(f32::INFINITY, true, true).is_err());
+    }
+    let stopped = timing(40., 80., 0.);
+    assert!(!stopped.finished(40., false, false).unwrap());
+    assert!(stopped.finished(80., false, false).unwrap());
+    assert!(timing(40., 40., 1.).finished(40., false, false).unwrap());
+}
+#[test]
 fn invalid_inputs_and_overflow_fail_without_nonfinite_output() {
     for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
         for parameters in [

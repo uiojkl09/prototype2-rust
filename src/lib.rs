@@ -2,6 +2,7 @@
 pub mod animation;
 pub mod animation_clock;
 pub mod animation_driver;
+pub mod animation_policy;
 pub mod binary;
 pub mod capsule;
 pub mod capsule_state;

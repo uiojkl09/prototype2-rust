@@ -47,6 +47,8 @@ record for these tested files. The new executable targets x64 MSVC independently
 | Authored scale / disabled metadata | Four additional tests passed (52 synthetic total) | Known rotating/stretched skin point; float/half3/scalar/float2/half2 scale, bind fallback, scale blending before parent composition; duplicate/nonfinite/axis/version/truncation rejection; empty metadata preserves inline/referenced keys and rejects active/nested/duplicate forms |
 | Animation action configuration | Two additional tests passed (54 synthetic total) | Independent field offsets, timing/frame/speed values, root/blend/sync flags, raw enum hashes, reference padding/UTF-8/limits, case-sensitive type dispatch, all short prefixes, nonfinite floats and trailing-byte rejection |
 | Cropped single-clip driver | Four additional tests passed (58 synthetic total) | Count-relative end conversion and wrapper clamping; duration-fit sign and existing cyclic state; signed steps, cropped wrap/clamp and endpoint epsilon; one-frame clips, zero/near-zero rates, nonfinite inputs and overflow rejection |
+| Original cycle/sync policy identities and driver flags | Two additional tests passed (60 synthetic total) | Independent fixed hash fixtures verify all seven cycle/two sync labels and native indices, case sensitivity and unknown failures; only From Animation inherits asset cyclic state; loop/hold flags remain distinct |
+| Directional driver completion | One additional test passed (61 synthetic total) | Forward/reverse endpoints, cyclic/hold suppression, zero speed and degenerate range; nonfinite frames rejected. Driver removal, event order and branch completion are not inferred |
 | Original animation action references | New opt-in installed-data test passed | All 549 action layouts decoded; 398 exact clip joins and 151 unresolved package-local references; cropped start frame 56 and external synchronization branch at 0x87601 retained. No scheduler/actor execution inferred |
 | Full skeletal reader/sampler corpus | 741 PTRN patterns decode and sample | Every track and both selected rigs sampled at zero/midpoint/last; 580 scale channels across 35 clips; 166 CAM and 24 EXP intentionally excluded. Actor compatibility, action reachability and complete power assembly remain unproven |
 | Owned graph and animation data | All nine opt-in retail tests passed | Six graphs / 2,930 branches / 8,981 records; 549 ordinary animation actions decoded; 741 skeletal clips sampled, 92-joint skeletons and nine skins; bind-pose identity within 0.0001; main idle/walk/run references joined; five measured root tracks in raw/relative spaces; Heller's original fixup config bound/applied across eleven selected clips and both skeletons |
@@ -63,6 +65,7 @@ record for these tested files. The new executable targets x64 MSVC independently
 | Cropped driver GPU rendering | Four bounded captures exited successfully and were visually inspected | Jump 56..160 fitted to 0.05s clamps at 160; punch 20..40 reverse fitted to 0.05s clamps at 20; kick 10..20 zero speed holds at 10; punch 20..40 fitted to 2s loops and captures at 25.392691. Shoulder/hood deformation remains unresolved |
 | Cropped driver CLI validation | Invalid timing values, loop boolean, out-of-range fixed samples and blend/timing conflicts rejected | No viewer opens for those invalid combinations. Default seven-clip/blend actual-window regression still passes; physical Xbox input remains untested |
 | Cropped driver window controls | Exact-window automation passed | End clamp, stable pause, restart to 56, pinned clip/blend selection, resumed end clamp and exit. Keyboard scan codes were sent only to the owned focused viewer; physical Xbox input was not simulated |
+| Policy corpus and CLI integration | All 549 policy hashes resolve and inspector smoke passed | Cycle counts: From Animation 399 / Not Cyclic 37 / Cyclic 67 / Hold End Frame 46; all Legacy sync. Selected 0x87601 displays From Animation/Legacy alongside raw hashes. New bounded advancing kick capture at 16.039852 was visually inspected and exited successfully; shoulder/hood deformation remains |
 
 Controller update: the native Windows API detected an Xbox/XInput device in slot 0.
 Its neutral raw readings (-232,159) / (909,129) yielded zero processed travel/look.
@@ -72,7 +75,7 @@ combinations remain separate playtest checks; automated state-transition tests p
 The metadata inspector reproduced the two character/startup leads in MOVEMENT.md.
 The animation viewer independently detected XInput slot 0. A/B edge behavior is
 covered by synthetic connection/held/focus tests; new animation-specific controls
-have not been physically tested by the owner. All current 58 synthetic tests, nine
+have not been physically tested by the owner. All current 61 synthetic tests, nine
 opt-in retail tests, fmt, default-feature all-target Clippy and x64 release build
 passed locally. Animation samples use inspection timing, not a recovered game tick.
 Root-motion tests measure authored clip displacement, not gameplay trajectories;

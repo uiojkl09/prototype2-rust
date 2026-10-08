@@ -42,6 +42,8 @@ cropped frames, speed/blend timing and root flags. Their state execution remains
 incomplete; see [action evidence](docs/FIGHT.md).
 The viewer also supports cropped frame ranges, signed speed, duration fitting and
 explicit loop/clamp inspection; see [driver options](docs/ANIMATION.md).
+Cycle/sync policy names and standalone loop/hold/completion rules now resolve;
+backward/time-slicing behavior and complete action execution remain incomplete.
 
 Use `view --game <directory>` for the world section. **World viewer Xbox controls:**
 left stick to move, right stick to look, A/B to rise/descend,

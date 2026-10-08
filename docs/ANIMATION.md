@@ -79,8 +79,10 @@ wrapped endpoints use **0.00001**, while already in-range frames stay unchanged.
 Finite inputs and arithmetic are checked. Rust uses f64 intermediates where
 appropriate; exact x87 instruction/rounding parity remains unproven.
 
-This is not an action clock/state machine: initialization/synchronization, cyclic
-enum interpretation, completion/events, reuse, layers and actor integration remain
+The cycle/sync enum names, isolated loop/hold flags and directional completion
+check are now recovered separately; see FIGHT.md. This is not an action clock/state
+machine: initialization/synchronization, backward/time-slicing behavior,
+completion lifecycle/events, reuse, layers and actor integration remain
 unresolved. Preview restart at the end for reverse speed is an inspection convention,
 not recovered action initFrame behavior. Presentation time remains focus-gated
 and capped at 0.1 seconds per render, separate from a future recovered simulation tick.
