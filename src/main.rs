@@ -1,6 +1,10 @@
 use anyhow::{Context, Result, bail, ensure};
-use prototype2_rust::{capsule, collision, controller, install, meta, p3d, rcf::Archive, scene};
+use prototype2_rust::{
+    animation, capsule, collision, controller, fight, install, meta, p3d, rcf::Archive, scene,
+};
 use std::{collections::BTreeMap, path::PathBuf};
+#[cfg(feature = "viewer")]
+mod animation_viewer;
 #[cfg(feature = "viewer")]
 mod viewer;
 
@@ -45,7 +49,9 @@ fn run() -> Result<()> {
                 "--seconds",
                 "--dead-zone",
                 "--look-speed",
-                "--invert-y"
+                "--invert-y",
+                "--clip",
+                "--sample-frame"
             ]
             .contains(&key.as_str()),
             "unknown option {key}"
@@ -66,6 +72,18 @@ fn run() -> Result<()> {
         "list" => &["--game", "--archive", "--filter", "--limit"],
         "chunks" => &["--game", "--archive", "--entry", "--limit"],
         "meta" => &["--game", "--archive", "--entry", "--filter", "--limit"],
+        "fight" => &["--game", "--archive", "--entry", "--filter", "--limit"],
+        "animations" => &["--game", "--filter", "--limit"],
+        "animate" => &[
+            "--game",
+            "--clip",
+            "--sample-frame",
+            "--frames",
+            "--screenshot",
+            "--dead-zone",
+            "--look-speed",
+            "--invert-y",
+        ],
         "scene" => &["--game", "--archive", "--entry"],
         "ray" => &["--game", "--archive", "--entry", "--origin", "--direction"],
         "sweep" => &["--game", "--archive", "--entry", "--origin", "--delta"],
@@ -139,6 +157,112 @@ fn run() -> Result<()> {
         .or_else(|| std::env::var_os("PROTOTYPE2_GAME").map(PathBuf::from))
         .context("supply --game <installed Prototype 2 directory> or PROTOTYPE2_GAME")?;
     ensure!(game.is_dir(), "game directory does not exist");
+    if command == "animations" || command == "animate" {
+        let boot = Archive::open(game.join("boot.rcf"))?;
+        let data = p3d::decode(&boot.read(boot.find("art\\alex\\alex.p3d")?)?)?;
+        let chunks = p3d::parse(&data)?;
+        if command == "animations" {
+            let all = animation::clips(&data, &chunks)?;
+            let filter = options
+                .get("--filter")
+                .map(String::as_str)
+                .unwrap_or("heller");
+            let limit: usize = options
+                .get("--limit")
+                .map(|s| s.parse())
+                .transpose()?
+                .unwrap_or(40);
+            ensure!(limit <= 1000, "--limit must be at most 1000");
+            for clip in all.iter().filter(|c| c.name.contains(filter)).take(limit) {
+                println!("{}", serde_json::to_string(clip)?);
+            }
+            println!(
+                "{} total clip headers; listing does not imply every encoding is playable",
+                all.len()
+            );
+            return Ok(());
+        }
+        #[cfg(feature = "viewer")]
+        {
+            let clip_name = options
+                .get("--clip")
+                .map(String::as_str)
+                .unwrap_or("heller_loco_run_n");
+            let clip = animation::load_clip(&data, &chunks, clip_name)?;
+            let mut clips = vec![clip];
+            let fig = p3d::decode(&boot.read(boot.find("art\\alex\\alex_fig.p3d")?)?)?;
+            let graphs = fight::load(&fig, &p3d::parse(&fig)?)?;
+            let graph = graphs
+                .iter()
+                .find(|g| g.name == "prototype")
+                .context("missing main character graph")?;
+            let mut main_tracks = graph
+                .records
+                .iter()
+                .filter(|r| r.steer.is_some() && graph.branch_matches(r.branch, "bare/loco"));
+            let record = main_tracks
+                .next()
+                .context("missing main bare locomotion track")?;
+            ensure!(
+                main_tracks.next().is_none(),
+                "ambiguous main bare locomotion track"
+            );
+            let infos = animation::clips(&data, &chunks)?;
+            let names = record
+                .steer
+                .as_ref()
+                .unwrap()
+                .animations_idle_walk_run
+                .iter()
+                .map(|hash| animation::resolve_clip(&infos, *hash).map(|c| c.name.as_str()))
+                .collect::<Result<Vec<_>>>()?;
+            println!(
+                "ANIMATION_REFERENCES: main LocoSteer 0x{:x}: idle/walk/run {:?}; state scheduling is not executed",
+                record.offset, names
+            );
+            for name in names
+                .into_iter()
+                .chain(["heller_loco_run_sprint_n", "heller_loco_jump_from_idle"])
+            {
+                if name != clip_name {
+                    clips.push(animation::load_clip(&data, &chunks, name)?);
+                }
+            }
+            let skeletons = ["alex_reg_body_skeleton", "alex_reg_arms_skeleton"]
+                .iter()
+                .map(|name| animation::skeleton(&data, &chunks, name))
+                .collect::<Result<Vec<_>>>()?;
+            let art = Archive::open(game.join("art.rcf"))?;
+            let model = p3d::decode(&art.read(art.find("art\\alex\\alex_model_main.p3d")?)?)?;
+            let meshes = prototype2_rust::skin::load(&model, &p3d::parse(&model)?, &skeletons)?;
+            let frames: Option<u32> = options.get("--frames").map(|s| s.parse()).transpose()?;
+            ensure!(
+                frames.is_none_or(|n| n >= 30),
+                "--frames must be at least 30"
+            );
+            let sample_frame: Option<f32> = options
+                .get("--sample-frame")
+                .map(|s| s.parse())
+                .transpose()?;
+            ensure!(
+                sample_frame
+                    .is_none_or(|n| n.is_finite() && n >= 0. && n <= clips[0].info.end_frame),
+                "--sample-frame out of clip range"
+            );
+            animation_viewer::run(
+                skeletons,
+                meshes,
+                clips,
+                frames,
+                options.get("--screenshot").map(PathBuf::from),
+                sample_frame,
+                settings,
+            );
+            return Ok(());
+        }
+        #[cfg(not(feature = "viewer"))]
+        bail!("animation viewer disabled; build with default features");
+    }
     if command == "inspect" {
         println!(
             "{}",
@@ -157,7 +281,11 @@ fn run() -> Result<()> {
     let archive = options
         .get("--archive")
         .map(String::as_str)
-        .unwrap_or("cells.rcf");
+        .unwrap_or(if command == "fight" {
+            "boot.rcf"
+        } else {
+            "cells.rcf"
+        });
     ensure!(
         archive.ends_with(".rcf") && !archive.contains(['/', '\\', ':']) && archive != "..",
         "--archive must be a filename within the install"
@@ -246,12 +374,13 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
-    let entry = a.find(
-        options
-            .get("--entry")
-            .map(String::as_str)
-            .unwrap_or(DEFAULT_ENTRY),
-    )?;
+    let entry = a.find(options.get("--entry").map(String::as_str).unwrap_or(
+        if command == "fight" {
+            "art\\alex\\alex_fig.p3d"
+        } else {
+            DEFAULT_ENTRY
+        },
+    ))?;
     let raw = a.read(entry)?;
     let data = p3d::decode(&raw)?;
     let chunks = p3d::parse(&data)?;
@@ -290,6 +419,47 @@ fn run() -> Result<()> {
             "{} matched metadata envelopes; showing {}. Bodies remain opaque; no property values or gameplay rules inferred.",
             objects.len(),
             objects.len().min(limit)
+        );
+        return Ok(());
+    }
+    if command == "fight" {
+        let graphs = fight::load(&data, &chunks)?;
+        let filter = options.get("--filter").map(String::as_str).unwrap_or("");
+        for graph in &graphs {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "context": graph.name, "data_offset": graph.data_offset,
+                    "branches": graph.branches.len(), "property_records": graph.records.len(),
+                    "capsule_tracks": graph.records.iter().filter(|r| r.capsule.is_some()).count(),
+                "steer_tracks": graph.records.iter().filter(|r| r.steer.is_some()).count(),
+                "sprint_tracks": graph.records.iter().filter(|r| r.sprint.is_some()).count(),
+                }))?
+            );
+            let matched: Vec<_> = graph
+                .records
+                .iter()
+                .filter(|r| {
+                    (r.capsule.is_some() || r.steer.is_some() || r.sprint.is_some())
+                        && graph.branch_matches(r.branch, filter)
+                })
+                .collect();
+            for record in matched.iter().take(limit) {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "branch": graph.branches[record.branch].derived_path, "record": record,
+                    }))?
+                );
+            }
+            println!(
+                "{} matched decoded tracks; showing {}",
+                matched.len(),
+                matched.len().min(limit)
+            );
+        }
+        println!(
+            "Graph and selected asset tracks only; conditions and other actions remain opaque."
         );
         return Ok(());
     }
@@ -389,12 +559,16 @@ fn help() {
     println!(
         "prototype2-rust: experimental retail-data viewer, NOT a playable reimplementation
 
-Commands: inspect | verify | scan | list | chunks | meta | capsule | scene | ray | sweep | view | controller
+Commands: inspect | verify | scan | list | chunks | meta | capsule | fight | animations | animate | scene | ray | sweep | view | controller
 Game commands require --game <Prototype 2 install directory> (or PROTOTYPE2_GAME)
 Selection: --archive cells.rcf --entry <internal path>
 list: --filter <substring> --limit 40
 chunks: --limit 40
 meta: --filter <ASCII name or body reference> --limit 40
+fight: --filter <branch path substring> --limit 40 (defaults to boot.rcf / art\\alex\\alex_fig.p3d)
+animations: --filter <clip substring> --limit 40 (character clip headers)
+animate: --clip <name> --sample-frame <frame> --frames <count> --screenshot <private PNG path>
+Animation inspection: A/B next/previous clip; sticks orbit/zoom; X pause; Y restart; LB slow; Menu exit.
 ray: --origin x,y,z --direction x,y,z
 capsule: decode the observed AlexPhysicsFactory asset (boot.rcf)
 sweep: --origin x,y,z --delta x,y,z (translation, not velocity; geometric query only)

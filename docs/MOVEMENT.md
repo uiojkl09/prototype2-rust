@@ -23,7 +23,9 @@ locomotion hull.
 meanings remain unknown. `art\alex\alex.p3d` has a physics object at decimal offset
 9,624,810 named human_ragdoll_HR, with 12 candidate primitive groups; this is a
 ragdoll asset lead, not proof of the locomotion hull. `art\alex\alex_fig.p3d` contains
-a collision_capsule identifier, but its fight-data schema is also unresolved.
+a checked fight graph with selected capsule and LocoSteer track schemas.
+Six contexts and the main movement branch are now decoded; see [FIGHT.md](FIGHT.md)
+for exact offsets, native corroboration and implemented isolated movement rules.
 The three inspected initialization Lua files are Lua 5.1 bytecode, not plain text.
 
 The new reader can reproduce the metadata locations without private extraction:
@@ -33,9 +35,9 @@ The new reader can reproduce the metadata locations without private extraction:
 .\prototype2-rust.exe meta --game 'F:\SteamLibrary\steamapps\common\Prototype 2' --archive boot.rcf --entry 'art\startup_tod.p3d.rz' --filter AnalyseCollisionParams
 ```
 
-Next recover the fight schemas/state transitions and remaining metadata/native
-consumers. Keep binary bodies/decompiler output private. No movement constants or
-retail contact rules have been accepted from these references alone. Controller
+Next recover state execution, sprint/jump drivers and remaining metadata/native
+consumers. Keep binary bodies/decompiler output private. Main LocoSteer values and
+isolated scalar rules are corroborated; retail contact rules remain unresolved. Controller
 input is now available and owner-tested; its dead zones/look speed are inspection
 preferences, separate from the original game's gameplay input response.
 

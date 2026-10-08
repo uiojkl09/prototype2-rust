@@ -36,15 +36,15 @@ pub struct Scene {
 }
 
 #[derive(Debug)]
-struct Attribute {
-    name: String,
-    encoding: u32,
-    format: u32,
-    offset: usize,
-    stride: usize,
-    count: usize,
+pub(crate) struct Attribute {
+    pub name: String,
+    pub encoding: u32,
+    pub format: u32,
+    pub offset: usize,
+    pub stride: usize,
+    pub count: usize,
 }
-fn descriptors(chunk: &Chunk, data: &[u8]) -> Result<Vec<Attribute>> {
+pub(crate) fn descriptors(chunk: &Chunk, data: &[u8]) -> Result<Vec<Attribute>> {
     let mut c = Cursor::new(chunk.payload(data));
     let count = c.u32()? as usize;
     ensure!(count <= 32, "too many vertex attributes");
@@ -73,14 +73,14 @@ fn descriptors(chunk: &Chunk, data: &[u8]) -> Result<Vec<Attribute>> {
     );
     Ok(attrs)
 }
-fn buffer<'a>(chunk: &Chunk, data: &'a [u8]) -> Result<&'a [u8]> {
+pub(crate) fn buffer<'a>(chunk: &Chunk, data: &'a [u8]) -> Result<&'a [u8]> {
     let mut c = Cursor::new(chunk.payload(data));
     let n = c.u32()? as usize;
     let raw = c.take(n)?;
     ensure!(c.pos == c.data.len(), "buffer length mismatch");
     Ok(raw)
 }
-fn buffer_name(chunk: &Chunk, data: &[u8]) -> Result<String> {
+pub(crate) fn buffer_name(chunk: &Chunk, data: &[u8]) -> Result<String> {
     let mut c = Cursor::new(chunk.payload(data));
     ensure!(c.u32()? == 0, "unsupported buffer version");
     c.string8()

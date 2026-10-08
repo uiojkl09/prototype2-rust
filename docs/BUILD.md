@@ -59,8 +59,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Package.ps1 -Outpu
 ```
 
 The script requires a clean tracked source tree, audits the index, builds the exact
-commit, packages the executable, full Git source archive, docs, Run.ps1, project and
-third-party notices, dependency license files, build identity and hash. It accepts
+commit, packages the executable, full Git source archive, docs, Run.ps1, Animate.ps1,
+project/third-party notices, dependency license files, build identity and hash. It accepts
 only an output directory outside the source repository. Screenshots, logs, extracted
 data, local references and dumps are not included. The source archive includes all
 build/test scripts. Inspect the final package entries before upload.

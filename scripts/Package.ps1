@@ -21,6 +21,7 @@ try {
     $scriptOutput = Join-Path $packageRoot 'scripts'
     $null = New-Item -ItemType Directory -Path $scriptOutput
     Copy-Item -LiteralPath 'scripts\Run.ps1' -Destination $scriptOutput
+    Copy-Item -LiteralPath 'scripts\Animate.ps1' -Destination $scriptOutput
     $sourceArchive = Join-Path $packageRoot 'source.zip'
     & git archive --format=zip -o $sourceArchive HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }

@@ -1,5 +1,176 @@
 //! Opt-in tests: retail data is read in place and never becomes a fixture.
-use prototype2_rust::{capsule, collision, meta, p3d, rcf::Archive, scene};
+use prototype2_rust::{capsule, collision, fight, meta, p3d, rcf::Archive, scene};
+
+#[test]
+#[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
+fn installed_character_skeletons_and_skin_bind_pose_agree() {
+    use prototype2_rust::{animation, skin};
+    let game = std::path::PathBuf::from(std::env::var_os("PROTOTYPE2_GAME").unwrap());
+    let boot = Archive::open(game.join("boot.rcf")).unwrap();
+    let data = p3d::decode(
+        &boot
+            .read(boot.find("art\\alex\\alex.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let chunks = p3d::parse(&data).unwrap();
+    let skeletons = ["alex_reg_body_skeleton", "alex_reg_arms_skeleton"]
+        .map(|name| animation::skeleton(&data, &chunks, name).unwrap());
+    assert!(skeletons.iter().all(|s| s.joints.len() == 92));
+    let clips = animation::clips(&data, &chunks).unwrap();
+    assert_eq!(clips.len(), 931);
+    let run = clips
+        .iter()
+        .find(|c| c.name == "heller_loco_run_n")
+        .unwrap();
+    assert_eq!(run.offset, 0x77176e);
+    assert_eq!(run.frames_per_second, 30.);
+    assert_eq!(run.end_frame, 21.);
+    let clip = animation::load_clip(&data, &chunks, "heller_loco_run_n").unwrap();
+    assert_eq!(clip.tracks.len(), 62);
+    let start = clip.sample(&skeletons[0], 0.).unwrap();
+    let middle = clip.sample(&skeletons[0], 10.5).unwrap();
+    assert!(start.iter().zip(&middle).any(|(a, b)| a != b));
+    for name in [
+        "heller_amb_stand",
+        "alex_amb_stand",
+        "heller_loco_walk_n",
+        "heller_loco_jump_from_idle",
+        "heller_loco_run_sprint_n",
+    ] {
+        let clip = animation::load_clip(&data, &chunks, name).unwrap();
+        for frame in [
+            0.,
+            clip.info.end_frame * 0.25,
+            clip.info.end_frame * 0.5,
+            clip.info.end_frame,
+        ] {
+            assert!(
+                clip.sample(&skeletons[0], frame)
+                    .unwrap()
+                    .iter()
+                    .all(|m| m.is_finite())
+            );
+        }
+    }
+    let fig = p3d::decode(
+        &boot
+            .read(boot.find("art\\alex\\alex_fig.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let graphs = fight::load(&fig, &p3d::parse(&fig).unwrap()).unwrap();
+    let graph = graphs.iter().find(|g| g.name == "prototype").unwrap();
+    let main: Vec<_> = graph
+        .records
+        .iter()
+        .filter(|r| r.steer.is_some() && graph.branch_matches(r.branch, "bare/loco"))
+        .collect();
+    assert_eq!(main.len(), 1);
+    assert_eq!(main[0].offset, 0x51495);
+    let names: Vec<_> = main[0]
+        .steer
+        .as_ref()
+        .unwrap()
+        .animations_idle_walk_run
+        .iter()
+        .map(|hash| {
+            animation::resolve_clip(&clips, *hash)
+                .unwrap()
+                .name
+                .as_str()
+        })
+        .collect();
+    assert_eq!(
+        names,
+        ["alex_amb_stand", "heller_loco_walk_n", "heller_loco_run_n"]
+    );
+    let art = Archive::open(game.join("art.rcf")).unwrap();
+    let data = p3d::decode(
+        &art.read(art.find("art\\alex\\alex_model_main.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let meshes = skin::load(&data, &p3d::parse(&data).unwrap(), &skeletons).unwrap();
+    assert_eq!(meshes.len(), 9);
+    for mesh in &meshes {
+        let s = skeletons.iter().find(|s| s.name == mesh.skeleton).unwrap();
+        let deformed = mesh.deform(s, &s.bind_world).unwrap();
+        for (p, q) in mesh.positions.iter().zip(deformed.positions) {
+            assert!(
+                (0..3).all(|i| (p[i] - q[i]).abs() < 0.0001),
+                "bind-pose skinning changed vertex"
+            );
+        }
+    }
+    println!("931 clip headers, two 92-joint skeletons, nine skinned meshes; bind pose preserved");
+}
+
+#[test]
+#[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
+fn installed_fight_graph_separates_main_locomotion_from_testing_branch() {
+    let game = std::path::PathBuf::from(std::env::var_os("PROTOTYPE2_GAME").unwrap());
+    let archive = Archive::open(game.join("boot.rcf")).unwrap();
+    let data = p3d::decode(
+        &archive
+            .read(archive.find("art\\alex\\alex_fig.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let graphs = fight::load(&data, &p3d::parse(&data).unwrap()).unwrap();
+    assert_eq!(graphs.len(), 6);
+    assert_eq!(graphs.iter().map(|g| g.branches.len()).sum::<usize>(), 2930);
+    let prototype = graphs.iter().find(|g| g.name == "prototype").unwrap();
+    let steer = prototype
+        .records
+        .iter()
+        .find(|r| r.offset == 0x51495)
+        .unwrap();
+    assert!(prototype.branch_matches(steer.branch, "bare/loco"));
+    let steer = steer.steer.as_ref().unwrap();
+    assert_eq!(steer.acceleration, 15.);
+    assert_eq!(steer.velocity_walk, 1.5);
+    assert_eq!(steer.velocity_run, 4.5);
+    assert_eq!(steer.turning_velocity_degrees, 360.);
+    assert_eq!(steer.turning_velocity_run_degrees, 720.);
+    let capsule = prototype
+        .records
+        .iter()
+        .find(|r| r.offset == 0x519d5)
+        .unwrap()
+        .capsule
+        .as_ref()
+        .unwrap();
+    assert!(capsule.animate && capsule.radius.enabled);
+    assert_eq!(capsule.radius.initial, 0.7);
+    assert_eq!(capsule.radius.final_value, 0.5);
+    assert_eq!(capsule.offset.initial, [0., 0., -0.1]);
+    let testing = prototype
+        .records
+        .iter()
+        .find(|r| r.type_hash == fight::name_hash("locomotion"))
+        .unwrap();
+    assert!(prototype.branch_matches(testing.branch, "new_feature_testing/locomotion"));
+    let sprint_graph = graphs
+        .iter()
+        .find(|g| g.name == "prototype_sprint")
+        .unwrap();
+    let sprint = sprint_graph
+        .records
+        .iter()
+        .find(|r| r.offset == 0x107cc1)
+        .unwrap();
+    assert!(sprint_graph.branch_matches(sprint.branch, "sprint/sprint/sprint"));
+    let sprint = sprint.sprint.as_ref().unwrap();
+    assert_eq!(sprint.velocities_min_mid_max, [7., 10., 16.]);
+    assert_eq!(sprint.accelerations_min_mid_max, [1.5, 0.75, 1.25]);
+    assert!(sprint.force_animation_velocities);
+    assert_eq!(sprint.unlockable_velocity_min, 9.);
+    println!(
+        "{} contexts, 2930 branches; main LocoSteer, capsule transition and testing branch checked",
+        graphs.len()
+    );
+}
 #[test]
 #[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
 fn installed_cell_decodes_and_references_real_ground_collision() {

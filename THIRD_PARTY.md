@@ -12,6 +12,10 @@ revision 026da397342c4f8a43af575232dccf4b104df2e5. RCF fields, filename hashing,
 metadata, RZ envelope, Pure3D chunk hierarchy and metadata-object envelopes informed
 the native readers. The new Rust metadata inspector is independently implemented;
 unknown serialized object bodies are not reinterpreted as recovered gameplay.
+Its 64-bit name-hash arithmetic was also cross-checked against actual fight graph
+identifiers; the new bounded graph reader and movement primitives are original code.
+Its Animation/Skeleton headers supplied format leads; compressed channels, ordered
+joints and skin streams were independently checked against bytes/native consumers.
 Its permissive source notice is preserved here conservatively for this lineage:
 
 > Copyright (c) 2012 Rick (rick 'at' gibbed 'dot' us)
@@ -69,10 +73,17 @@ revisions and evaluations are in docs/RESEARCH.md. The Noesis importer was exami
 as a format clue; its code was not copied/ported because no clear reuse license was
 established. Scene/collision structures were derived and checked from actual bytes.
 Private community messages and their attachments are not redistributed.
+An existing community fight editor provided private schema/type leads. No reuse
+license was established for its compiled implementation, so no editor code was
+copied or ported. Graph envelopes and selected properties were independently checked
+against installed bytes and native field registration/consumers. Native decompiler
+output is private evidence, not redistributed source or a runtime dependency.
+Compiled skeleton/skin/animation type headers were also private leads. No compiled
+editor implementation was ported; the readers and math are original Rust code.
 
 ## Rust dependencies and binary notices
 
-Bevy uses MIT OR Apache-2.0. flate2 uses MIT OR Apache-2.0. anyhow, serde, serde_json
+Bevy uses MIT OR Apache-2.0. glam uses MIT OR Apache-2.0. flate2 uses MIT OR Apache-2.0. anyhow, serde, serde_json
 and sha2 use MIT OR Apache-2.0. Transitive dependencies retain their own licenses;
 Cargo.lock and Cargo metadata identify the exact resolved graph. Package.ps1 collects
 distributed LICENSE/COPYING/NOTICE files, including nested font/asset notices, into

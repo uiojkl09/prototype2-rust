@@ -36,6 +36,12 @@ record for these tested files. The new executable targets x64 MSVC independently
 | Additional section summaries | green_zone/Cell_18: 24 meshes, 74,244 triangles; yellow_zone/Cell_49: 33 meshes, 74,949 triangles | Limited merged-buffer decoder works on additional real cells; these are not fully assembled scenes |
 | Native viewer | Ran, captured frames and exited successfully | Real meshes reached the GPU/window and produced nonempty frames |
 | Formatting / Clippy | Passed with warnings denied | Source hygiene checks for all compiled targets; not semantic correctness |
+| Character graph / isolated rules | Eight additional synthetic tests passed | Bounded graph records, hashes and selected schemas; LocoSteer scalar rules and capsule capture/interpolation/restore |
+| Animation / skin | Six synthetic tests passed | Known rotating two-joint skin pose; inline/compressed key equivalence, malformed counts/offsets/keys/joints, half encodings and exact hash reference resolution |
+| Capsule begin regression | One additional test passed (34 synthetic total) | Static/begin shape uses initial values without interpolating an unused overflowing final difference; non-finite action bounds rejected |
+| Owned graph and animation data | All five opt-in retail tests passed | Six graphs / 2,930 branches / 8,981 records; six supported clips, 92-joint skeletons and nine skins; bind-pose identity within 0.0001; main idle/walk/run references joined |
+| Animation GPU playback | Run frames 0 / 10.5 differ; continuous walk captured at frame 14.959668 | Original mesh deformation and time advancement reach the renderer; not gameplay transitions/root motion |
+| Actual animation window controls | Automated next/previous, pause stability, restart to frame zero and exit passed | Keyboard scan-code input into the exact focused runtime window; physical Xbox mapping still awaits owner testing |
 
 Controller update: the native Windows API detected an Xbox/XInput device in slot 0.
 Its neutral raw readings (-232,159) / (909,129) yielded zero processed travel/look.
@@ -43,6 +49,11 @@ The viewer logged the connection, and the owner reported that the listed control
 controls work with no drift. Physical disconnection/focus and other device/transport
 combinations remain separate playtest checks; automated state-transition tests pass.
 The metadata inspector reproduced the two character/startup leads in MOVEMENT.md.
+The animation viewer independently detected XInput slot 0. A/B edge behavior is
+covered by synthetic connection/held/focus tests; new animation-specific controls
+have not been physically tested by the owner. All current 34 synthetic tests, five
+opt-in retail tests, fmt, default-feature all-target Clippy and x64 release build
+passed locally. Animation samples use inspection timing, not a recovered game tick.
 
 The v0.1.0 hosted CI build/check step passed, but its packaging step failed while
 loading Cargo JSON passed through PowerShell. v0.1.1 reads that metadata directly

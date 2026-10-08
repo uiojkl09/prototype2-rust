@@ -23,7 +23,7 @@ feature set. MIT/Apache-2.0 licensing permits this adapter in an MIT project.
 | --- | --- |
 | Large streamed world | Native mesh rendering works for one section. Cell lifecycle, streaming queues, draw budgets, LOD, instancing, visibility and origin handling still need evidence and profiling. |
 | Faithful rendering | Current diagnostic colors are substitutes. Retail materials, texture maps, shader semantics, shadows and time-of-day are unimplemented. Bevy PBR is not an automatic match. |
-| Animation | Bevy provides animation infrastructure. Pure3D skeletons, constraints, compression, root motion and transition behavior need readers/contracts first. |
+| Animation | Core skeleton/packed clip sampling and skin deformation work; Bevy renders their CPU products. Retail transitions, root-motion integration, constraints, morphs and blending still need evidence. |
 | Simulation | Keep original rules in a renderer-independent explicit step, fixed input timeline and replayable state. A stock physics/controller must not become the specification. No gameplay simulation exists yet. |
 | Performance | One section has run on the owner's RTX 4070 Ti. No 4K frame-time or multi-CPU guarantee is established; collect traces before changing architecture. |
 | Mods | Clear format products and authored Rust systems are inspectable. Stable mod API, overrides and sandbox policy are future work. |
@@ -44,6 +44,13 @@ schema/geometry evidence. `collision` provides an independent swept geometric qu
 for investigation, with no retail solver, integration or renderer dependency.
 Commands retain unknown tags and explicitly report overlap/nonconvergence. Neither
 module establishes the active locomotion hull or supplies gameplay constants.
+
+`fight`, `locomotion` and `capsule_state` expose checked graph structures and isolated
+recovered scalar/shape rules. They do not supply a scheduler or game simulation.
+`animation` and `skin` use glam math without Bevy to read/sample/deform original
+character assets. `animation_viewer` is a separate adapter with an inspection clock
+and root-neutral preview policy; it must not become the retail movement contract.
+See FIGHT.md and ANIMATION.md for evidence and remaining behaviors.
 
 The design was informed by [IW4L's asset-loading separation](https://github.com/vladtrc/iw4L/blob/a2f4e0b8573eeb828001f8ee757b5b724eee196f/docs/MAP-LOAD.md)
 and explicit simulation input/time. None of its game-specific engine code is reused.

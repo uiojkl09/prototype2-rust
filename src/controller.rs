@@ -106,6 +106,9 @@ pub struct Controls {
     pub reset: bool,
     pub toggle_collision: bool,
     pub exit: bool,
+    /// Animation-inspection edges; existing viewer travel still uses held A/B.
+    pub next_clip: bool,
+    pub previous_clip: bool,
 }
 
 #[derive(Default)]
@@ -162,6 +165,8 @@ impl Tracker {
             reset: edges & Y != 0,
             toggle_collision: edges & X != 0,
             exit: edges & START != 0,
+            next_clip: edges & A != 0,
+            previous_clip: edges & B != 0,
         }
     }
 }

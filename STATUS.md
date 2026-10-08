@@ -23,18 +23,30 @@ format/research/validation notes; do not repeat the archive investigation.
 - Independent geometric swept-capsule query and `sweep` command: face/edge/vertex
   contact, overlap reporting and retained unknown tags; real ground-patch test passed.
 - Synthetic parser/query tests and opt-in retail-data test.
+- Checked `fig0` reader: six character contexts, 2,930 branches, 8,981 property
+  records; selected LocoSteer/capsule tracks decoded with native corroboration.
+- Isolated LocoSteer target-speed, acceleration and turning rules in Rust; single
+  capsule-action capture/interpolation/restore. These do not yet form gameplay.
+- Original skeleton/packed rotation/translation readers, compressed key blocks and
+  checked skin references. Nine Heller skin meshes deform using original clips.
+- `animate` plays run, idle, walk, sprint and jump; Xbox A/B select clips, X pauses,
+  Y restarts, sticks orbit/zoom and Menu exits. Fixed-pose GPU captures and continuous
+  playback verified. Animation-specific physical controls have not been owner-tested.
 
 ## Incomplete / unknown
 
 - Materials/textures, instance transforms, local prop placement, visibility, full
-  scene assembly, cell streaming and animation.
+  scene assembly, cell streaming and full model/morph/cloth assembly.
+- Animation state transitions, blending/events, root-motion integration and native
+  interpolation parity. Current playback loops clips in place using a preview clock.
 - Collision tag/filter semantics, 232,810 selected ground-tail bytes, box/convex
   primitives, active player hull/transforms, retail contact response and acceleration
   structure. The decoded default factory is not confirmed as the walking hull.
 - Every gameplay system, including movement, parkour, powers, combat, missions,
   progression, AI and audio. No faithful movement slice or original-game comparison.
-- Retail timing and movement constants/rules. Selective native capsule schema and
-  geometry inspection used PE parsing/Capstone; Ghidra has not been run.
+- Retail timing, input/component interpretation and complete movement rules.
+  Selective Ghidra analysis has now run; main LocoSteer values and isolated scalar
+  rules are recovered. State execution, root motion and contacts remain incomplete.
 - Windows 10, 4K performance, other CPU configurations and long-run compatibility.
 - Interactive 4K/resizing/long-run playtest; controller input has been owner-tested,
   but automated capture alone is not a full playtest result.
@@ -52,17 +64,20 @@ format/research/validation notes; do not repeat the archive investigation.
 
 ## Next work, in order
 
-1. Decode fight-node serialization, locomotion/capsule tracks and state transitions.
-   Native capsule field names and geometry are recovered; exact evidence and queries
-   are in docs/CAPSULE.md. Recover active hull/transforms and intersection-property
-   filtering/contact response before interpreting the query as player collision.
-2. Relate a reachable original-game patch to loaded coordinates and recover/measure
+1. **Animation before textures**, following the owner's priority. Continue from
+   docs/ANIMATION.md: original clips now play. Recover animation/action references,
+   transitions, blending and the root-motion driver, then connect them to state.
+2. Continue from docs/FIGHT.md: graph serialization and selected LocoSteer/capsule
+   schemas are implemented. Resolve conditions/references, sprint/jump drivers and
+   action scheduling. Recover active hull/transforms, filtering and contact response
+   before interpreting the query as player collision.
+3. Relate a reachable original-game patch to loaded coordinates and recover/measure
    original input, timing, velocity and camera behavior. Follow docs/MOVEMENT.md.
-3. Implement an explicit simulation step and initial walking/jumping slice from that
+4. Implement an explicit simulation step and initial walking/jumping slice from that
    evidence, then compare repeatable traces. Perfect recreation remains the target;
    guessed mechanics or inspection speeds must not stand in for original behavior.
-4. Recover scene instance/material references, then textures, props and animation.
-5. Continue compatibility checks with docs/PLAYTEST.md and docs/CONTROLLER.md.
+5. Recover scene instance/material references, then textures and props.
+6. Continue compatibility checks with docs/PLAYTEST.md and docs/CONTROLLER.md.
    Basic owner Xbox playtest passed; retain diagnostics outside source.
 
 Private files are in a sibling `Rust Rewrite.local` directory in the owner's

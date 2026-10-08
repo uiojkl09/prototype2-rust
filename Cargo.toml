@@ -1,6 +1,6 @@
 [package]
 name = "prototype2-rust"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 rust-version = "1.89"
 license = "MIT"
@@ -17,6 +17,7 @@ flate2 = "=1.1.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
+glam = "=0.30.10"
 bevy = { version = "=0.18.1", optional = true, default-features = false, features = ["std", "async_executor", "multi_threaded", "bevy_asset", "bevy_log", "bevy_color", "bevy_core_pipeline", "bevy_render", "bevy_camera", "bevy_mesh", "bevy_light", "bevy_pbr", "bevy_window", "bevy_winit", "keyboard", "mouse", "x11", "png", "tonemapping_luts", "zstd_rust"] }
 
 [profile.dev]
