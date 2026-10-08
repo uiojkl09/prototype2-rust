@@ -77,6 +77,9 @@ distributed LICENSE/COPYING/NOTICE files, including nested font/asset notices, i
 `dependency-licenses/` beside the binary and records SPDX metadata in inventory.json.
 That directory includes target/build-only dependencies conservatively. Generated
 notices are outside this source repository and contain no game assets.
+When a published crate omits notice files, the packager retrieves its upstream
+notices at the exact Git revision recorded in .cargo_vcs_info.json. Source URLs
+are retained in the inventory; missing notices fail packaging.
 
 Original game data, proprietary binaries and trademarks are not covered by the
 project's MIT license. Players supply their own installation.
