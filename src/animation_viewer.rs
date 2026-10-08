@@ -8,6 +8,7 @@ use bevy::{
 use prototype2_rust::{
     animation::{Clip, Skeleton},
     animation_driver, controller,
+    pose_fixup::BoundFixups,
     skin::SkinMesh,
 };
 use std::path::PathBuf;
@@ -17,6 +18,7 @@ struct Character {
     skeletons: Vec<Skeleton>,
     skins: Vec<SkinMesh>,
     clips: Vec<Clip>,
+    fixups: Vec<BoundFixups>,
     locomotion: LocomotionPreview,
 }
 pub struct LocomotionPreview {
@@ -57,10 +59,15 @@ pub fn run(
     skeletons: Vec<Skeleton>,
     skins: Vec<SkinMesh>,
     clips: Vec<Clip>,
+    fixups: Vec<BoundFixups>,
     locomotion: LocomotionPreview,
     options: Inspection,
     settings: controller::Settings,
 ) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        skeletons.len() == fixups.len(),
+        "pose-fixup binding count mismatch"
+    );
     let Inspection {
         stop_after,
         screenshot,
@@ -86,7 +93,7 @@ pub fn run(
         "ANIMATION_LOCOMOTION: RB toggles shared-phase idle/walk/run blend; left stick controls inspection speed up to {}; no actor travel/contact response",
         locomotion.velocities[2]
     );
-    let outcome = App::new().insert_resource(Character { skeletons,skins,clips,locomotion })
+    let outcome = App::new().insert_resource(Character { skeletons,skins,clips,fixups,locomotion })
         .insert_resource(Playback { frame: sample_frame.unwrap_or(0.),clip_index: 0,fixed: sample_frame.is_some(),paused: false,renders: 0,stop_after,screenshot,captured: false,yaw: 0.4,pitch: 0.1,distance: 3.5,tracker: controller::Tracker::default(),settings,locomotion: locomotion_speed.is_some(),phase: 0.,speed: locomotion_speed.unwrap_or(0.),weights: initial.weights,fixed_speed: locomotion_speed })
         .insert_resource(ClearColor(Color::srgb(0.035,0.045,0.065)))
         .add_plugins(DefaultPlugins.set(WindowPlugin { primary_window: Some(Window { title: "Prototype 2 Rust | Heller animation | A/B clips; RB blend; sticks orbit/zoom; X pause; Y restart; LB slow; Menu exit".into(),resolution: (1280,900).into(),..default() }),..default() }))
@@ -248,7 +255,8 @@ fn play(
     let worlds: anyhow::Result<Vec<_>> = character
         .skeletons
         .iter()
-        .map(|s| {
+        .zip(&character.fixups)
+        .map(|(s, fixups)| {
             let mut world = if state.locomotion {
                 animation_driver::sample_locomotion(
                     s,
@@ -260,6 +268,7 @@ fn play(
             } else {
                 character.clips[state.clip_index].sample(s, state.frame)?
             };
+            fixups.apply(s, &mut world)?;
             let correction = s.bind_world[0] * world[0].inverse();
             for m in &mut world {
                 *m = correction * *m;

@@ -228,7 +228,57 @@ not establish gameplay jump height or jump timing. Playback still uses the
 root-neutral preview; actual interval selection, blended root-driver evaluation,
 actor integration, contacts and original-game trace comparison remain incomplete.
 
-Materials are diagnostic colors. Morph/cloth/expression assembly, constraints,
+## Heller corrective pose strategies
+
+The preview now reads `boot.rcf / art\alex\alex_tod.p3d` and applies the two
+strategies in `HellerPoseFixupProperties` after clip/blend evaluation and before
+root removal/skinning. The object definition is at **0x36a**, META body at
+**0x3f1**, 233 bytes. `TransformationDrawable` and `PrototypeTemplate` reference
+this object at **0x78e / 0x7235** respectively. These are selected object references,
+not proof that the runtime executes the full original behaviour/state lifecycle.
+
+The nested v1 `PoseStrategyCollarRig` layout token is **0x08c2bd93**. Fields are
+left/right collar and chin names, chin offset float3, displacement power and maximum
+projected displacement. The installed values are `Collar_L`, `Collar_R`, `Jaw`,
+(0,0,-0.1), 5 and 1. `PoseStrategyShoulderCon`, token **0x1a80a495**, supplies two
+source/target pairs: `Shoulder_L` to `Shoulder_Con_L`, and the corresponding right
+pair. Both nested entries have the inspected trailing markers 1/1. Their broader
+activation policy is outside this preview: different markers fail, and these
+configured operations are always applied during inspection.
+
+Field registration **0x1016efe0 / 0x1016f290 / 0x101709c0**, joint binding
+**0x1016e2b0 / 0x1016e320**, strategy updates **0x1016f8c0 / 0x1016e920** and
+pose writer **0x106b2550** corroborate the layouts and operations. Behaviour dispatch
+**0x10154210** iterates configured strategies; its actor activation/state gating
+is not reproduced. Vector transformation **0x107e5ec0** excludes translation;
+matrix copy/product **0x100019f0 / 0x107e7990** corroborate local/world composition.
+
+Shoulder correction copies the source local pose into the corrective joint and
+updates its world/skin pose under the target parent. The tested pairs share a
+parent and have leaf targets, so the resulting world matrix equals the source.
+Collar correction transforms the configured chin offset as a vector through the
+chin parent's inverse bind orientation, then projects the current and bind chin
+points into the left collar parent's coordinates. Let their Z difference be d,
+bind-projected Z be r, and left/right bind translations be l and h. With power p,
+the gain is `(1 + abs(d))^p - 1`. For d > 0, add `min(maximum, (h-r)*gain)` to
+right bind Z. Otherwise subtract `min(maximum, -(l-r)*gain)` from left bind Z.
+The other collar uses bind Z. Both use bind X/Y and retain current local orientation.
+The clamp is an upper limit; a negative computed offset is retained.
+
+The independent `pose_fixup` module validates bounded strings/counts/tokens and
+complete payloads, binds exact joint names, and rejects unsupported/non-leaf or
+different-parent rigs. It does not invent descendant propagation. Singular/nonfinite
+poses, stale bindings and overflow fail. Synthetic fixtures verify copy/hierarchy,
+both collar directions, upper-limit and negative-offset behavior, rotated chin
+offsets, translation reset/orientation preservation and malformed layouts.
+An installed-data test evaluates six clips on both selected skeletons and deforms
+all nine skins. Exact power/inverse/SIMD rounding parity is unproven.
+
+A same-frame run capture at 10.5 was visually compared with the earlier capture:
+corrective shoulder geometry changes, but shoulder/hood overlap remains visible.
+These two strategies do not complete the model or establish retail appearance.
+
+Materials are diagnostic colors. Morph/cloth/expression assembly, additional constraints,
 retail shaders, motion events, transitions, layered blends, grounded movement and
 camera behavior remain unresolved. Some shoulder/hood geometry visibly overlaps.
 Selected clips passing does not establish support for all 931 headers.

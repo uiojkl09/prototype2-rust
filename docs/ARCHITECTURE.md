@@ -53,6 +53,8 @@ pose-blend rules with explicit seconds. Action selection, partitions and layerin
 remain separate; native quaternion approximation parity has not been established.
 `root_motion` extracts authored single-clip deltas with explicit endpoints and
 flags, independently of skeleton bind fallback and actor/contact integration.
+`pose_fixup` reads the selected Heller collar/shoulder strategies and applies their
+checked leaf-joint corrections before skinning; actor activation policies remain separate.
 `animation_viewer` is a separate adapter with an inspection clock
 and root-neutral preview policy; it must not become the retail movement contract.
 See FIGHT.md and ANIMATION.md for evidence and remaining behaviors.

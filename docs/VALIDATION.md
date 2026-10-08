@@ -43,12 +43,14 @@ record for these tested files. The new executable targets x64 MSVC independently
 | Animation sync/frame mapping | Two additional tests passed (38 synthetic total) | Checked default sync child and malformed/duplicate rejection; explicit shared phase maps to each clip with offset/wrapping; installed walk phase 0.1 maps to frame 3.6 |
 | Local locomotion pose blending | Two additional tests passed (40 synthetic total) | Known child position after local blending/parent composition, walk endpoint, antipodal/zero-dot rotation hemisphere and overflow rejection; six speeds checked on both installed skeletons |
 | Single-clip root motion | Four additional tests passed (44 synthetic total) | Cropped/wrapped/reversed frame intervals, relative translation, independent noncommuting quaternion order, missing channels, bad bounds/keys and overflow |
-| Owned graph and animation data | All six opt-in retail tests passed | Six graphs / 2,930 branches / 8,981 records; six supported clips, 92-joint skeletons and nine skins; bind-pose identity within 0.0001; main idle/walk/run references joined; five measured root tracks in raw/relative spaces |
+| Heller pose-fixup rules | Four additional tests passed (48 synthetic total) | Known corrective point, collar projection/power/sign/upper limit, rotated chin offset, bind translation/current orientation, unsupported rigs, stale bindings, malformed layouts and overflow |
+| Owned graph and animation data | All seven opt-in retail tests passed | Six graphs / 2,930 branches / 8,981 records; six supported clips, 92-joint skeletons and nine skins; bind-pose identity within 0.0001; main idle/walk/run references joined; five measured root tracks in raw/relative spaces; Heller's original fixup config bound/applied across six clips and both skeletons |
 | Animation GPU playback | Run frames 0 / 10.5 differ; continuous walk captured at frame 14.959668 | Original mesh deformation and time advancement reach the renderer; not gameplay transitions/root motion |
 | Actual animation window controls | Automated next/previous, pause stability, restart to frame zero and exit passed | Keyboard scan-code input into the exact focused runtime window; physical Xbox mapping still awaits owner testing |
 | Shared-phase blend renderer | Two bounded captures exited successfully | Speed 3: phase 0.562845, weights 0/0.5/0.5; speed 0.75: phase 0.312983, weights 0.5/0.5/0; deformed standing/striding poses visually inspected, cloth assembly remains incomplete |
 | Actual blend window controls | Mode switching, phase advancement, pause stability, reset and return to clip mode passed | Keyboard scan-code input into the focused viewer; RB edges are covered by synthetic focus/held-button checks, physical RB/left-stick blend control remains untested |
 | v0.1.5 animation regression | Actual-window automation and bounded blend capture passed again | Shared channel sampler still renders the walk/run blend at speed 3, phase 0.575615, weights 0/0.5/0.5; screenshot visually inspected, no actor motion applied |
+| Corrective pose rendering / controls | Same-frame run capture and actual-window automation passed | Run 10.5 compared with earlier capture; corrective shoulder shape changes but overlap remains; clip/blend switching, advancing phase, pause, reset and exit still pass; physical Xbox controls not exercised by automation |
 
 Controller update: the native Windows API detected an Xbox/XInput device in slot 0.
 Its neutral raw readings (-232,159) / (909,129) yielded zero processed travel/look.
@@ -58,7 +60,7 @@ combinations remain separate playtest checks; automated state-transition tests p
 The metadata inspector reproduced the two character/startup leads in MOVEMENT.md.
 The animation viewer independently detected XInput slot 0. A/B edge behavior is
 covered by synthetic connection/held/focus tests; new animation-specific controls
-have not been physically tested by the owner. All current 44 synthetic tests, six
+have not been physically tested by the owner. All current 48 synthetic tests, seven
 opt-in retail tests, fmt, default-feature all-target Clippy and x64 release build
 passed locally. Animation samples use inspection timing, not a recovered game tick.
 Root-motion tests measure authored clip displacement, not gameplay trajectories;

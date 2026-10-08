@@ -41,6 +41,10 @@ format/research/validation notes; do not repeat the archive investigation.
   cycle crossing, segment-relative translation and reverse flags. `root-motion`
   reports explicit frame endpoints; five real root tracks measured in both spaces.
   This is authored clip motion, with no actor/contact integration or scheduler.
+- Heller's installed collar/shoulder pose-fixup configuration now updates corrective
+  joints before skinning in single-clip and blended previews. Six clips on both
+  skeletons tested; visual overlap still remains. Broader state/rig policies are
+  unsupported, documented in ANIMATION.md.
 
 ## Incomplete / unknown
 

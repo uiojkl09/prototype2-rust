@@ -298,6 +298,16 @@ fn run() -> Result<()> {
             let art = Archive::open(game.join("art.rcf"))?;
             let model = p3d::decode(&art.read(art.find("art\\alex\\alex_model_main.p3d")?)?)?;
             let meshes = prototype2_rust::skin::load(&model, &p3d::parse(&model)?, &skeletons)?;
+            let tod = p3d::decode(&boot.read(boot.find("art\\alex\\alex_tod.p3d")?)?)?;
+            let fixups = prototype2_rust::pose_fixup::load(&tod, &p3d::parse(&tod)?)?;
+            let bound_fixups = skeletons
+                .iter()
+                .map(|s| fixups.bind(s))
+                .collect::<Result<Vec<_>>>()?;
+            println!(
+                "ANIMATION_FIXUPS: Heller configuration at 0x{:x}; collar and shoulder corrective joints, before skinning",
+                fixups.definition_offset
+            );
             let frames: Option<u32> = options.get("--frames").map(|s| s.parse()).transpose()?;
             ensure!(
                 frames.is_none_or(|n| n >= 30),
@@ -346,6 +356,7 @@ fn run() -> Result<()> {
                 skeletons,
                 meshes,
                 clips,
+                bound_fixups,
                 animation_viewer::LocomotionPreview {
                     indices,
                     velocities: [0., track.velocity_walk, track.velocity_run],

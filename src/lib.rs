@@ -11,6 +11,7 @@ pub mod install;
 pub mod locomotion;
 pub mod meta;
 pub mod p3d;
+pub mod pose_fixup;
 pub mod rcf;
 pub mod root_motion;
 pub mod scene;

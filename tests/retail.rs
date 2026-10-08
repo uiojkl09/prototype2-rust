@@ -3,6 +3,105 @@ use prototype2_rust::{capsule, collision, fight, meta, p3d, rcf::Archive, scene}
 
 #[test]
 #[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
+fn installed_heller_fixups_bind_and_deform_selected_original_poses() {
+    use prototype2_rust::{animation, pose_fixup, skin};
+    let game = std::path::PathBuf::from(std::env::var_os("PROTOTYPE2_GAME").unwrap());
+    let boot = Archive::open(game.join("boot.rcf")).unwrap();
+    let tod = p3d::decode(
+        &boot
+            .read(boot.find("art\\alex\\alex_tod.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let fixups = pose_fixup::load(&tod, &p3d::parse(&tod).unwrap()).unwrap();
+    assert_eq!(
+        (fixups.definition_offset, fixups.body_offset),
+        (0x36a, 0x3f1)
+    );
+    assert_eq!(fixups.strategies.len(), 2);
+    let pose_fixup::Strategy::Collar(collar) = &fixups.strategies[0] else {
+        panic!("wrong first fixup")
+    };
+    assert_eq!(
+        (&*collar.left, &*collar.right, &*collar.chin),
+        ("Collar_L", "Collar_R", "Jaw")
+    );
+    assert_eq!(collar.chin_offset, [0., 0., -0.1]);
+    assert_eq!(
+        (collar.displacement_power, collar.maximum_displacement),
+        (5., 1.)
+    );
+    let pose_fixup::Strategy::Shoulder { pairs } = &fixups.strategies[1] else {
+        panic!("wrong second fixup")
+    };
+    assert_eq!(pairs.len(), 2);
+    let data = p3d::decode(
+        &boot
+            .read(boot.find("art\\alex\\alex.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let chunks = p3d::parse(&data).unwrap();
+    let skeletons: Vec<_> = ["alex_reg_body_skeleton", "alex_reg_arms_skeleton"]
+        .into_iter()
+        .map(|name| animation::skeleton(&data, &chunks, name).unwrap())
+        .collect();
+    let art = Archive::open(game.join("art.rcf")).unwrap();
+    let model = p3d::decode(
+        &art.read(art.find("art\\alex\\alex_model_main.p3d").unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let meshes = skin::load(&model, &p3d::parse(&model).unwrap(), &skeletons).unwrap();
+    let mut changed = false;
+    for (name, frame) in [
+        ("alex_amb_stand", 20.),
+        ("heller_amb_stand", 20.),
+        ("heller_loco_walk_n", 18.),
+        ("heller_loco_run_n", 10.5),
+        ("heller_loco_run_sprint_n", 8.),
+        ("heller_loco_jump_from_idle", 50.),
+    ] {
+        let clip = animation::load_clip(&data, &chunks, name).unwrap();
+        for skeleton in &skeletons {
+            let bound = fixups.bind(skeleton).unwrap();
+            let original = clip.sample(skeleton, frame).unwrap();
+            let mut world = original.clone();
+            bound.apply(skeleton, &mut world).unwrap();
+            for [source, target] in pairs {
+                assert!(!clip.tracks.contains_key(target));
+                let source = skeleton
+                    .joints
+                    .iter()
+                    .position(|j| j.name == *source)
+                    .unwrap();
+                let target = skeleton
+                    .joints
+                    .iter()
+                    .position(|j| j.name == *target)
+                    .unwrap();
+                assert_eq!(world[target], world[source]);
+            }
+            for mesh in meshes.iter().filter(|m| m.skeleton == skeleton.name) {
+                let before = mesh.deform(skeleton, &original).unwrap();
+                let after = mesh.deform(skeleton, &world).unwrap();
+                assert_eq!(before.positions.len(), after.positions.len());
+                changed |= before
+                    .positions
+                    .iter()
+                    .zip(&after.positions)
+                    .any(|(a, b)| a.iter().zip(b).any(|(a, b)| (*a - *b).abs() > 1e-5));
+            }
+        }
+    }
+    assert!(
+        changed,
+        "configured pose fixups must affect the skinned corpus"
+    );
+}
+
+#[test]
+#[ignore = "requires PROTOTYPE2_GAME pointing at the user's owned installation"]
 fn installed_root_tracks_extract_measured_clip_motion_in_both_spaces() {
     use prototype2_rust::{
         animation,
