@@ -1,0 +1,23 @@
+name: build-and-check
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pinned toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+      - name: Source publication audit
+        run: python scripts/audit-publication.py
+      - name: Build and check
+        shell: powershell
+        run: ./scripts/Build.ps1
+      - name: Package binary, exact source, docs and notices
+        shell: powershell
+        run: ./scripts/Package.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP 'prototype2-rust-windows-x64')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prototype2-rust-windows-x64
+          path: ${{ runner.temp }}/prototype2-rust-windows-x64.zip

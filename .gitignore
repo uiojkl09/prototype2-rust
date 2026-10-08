@@ -1,0 +1,28 @@
+# Default deny. Only project source, documentation and explicit build inputs may be tracked.
+*
+!/.gitignore
+!/.gitattributes
+!/AGENTS.md
+!/README.md
+!/STATUS.md
+!/LICENSE
+!/THIRD_PARTY.md
+!/Cargo.toml
+!/Cargo.lock
+!/rust-toolchain.toml
+!/src/
+!/src/**/
+!/src/**/*.rs
+!/tests/
+!/tests/**/
+!/tests/**/*.rs
+!/docs/
+!/docs/**/
+!/docs/**/*.md
+!/scripts/
+!/scripts/*.ps1
+!/scripts/*.py
+!/.github/
+!/.github/workflows/
+!/.github/workflows/ci.yml
+# No retail data, local research or binary build artifacts belong in this repository.

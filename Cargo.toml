@@ -1,0 +1,32 @@
+[package]
+name = "prototype2-rust"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+license = "MIT"
+description = "Independent Prototype 2 data investigation and experimental world viewer"
+repository = "https://github.com/uiojkl09/prototype2-rust"
+
+[features]
+default = ["viewer"]
+viewer = ["dep:bevy"]
+
+[dependencies]
+anyhow = "1.0"
+flate2 = "=1.1.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+bevy = { version = "=0.18.1", optional = true, default-features = false, features = ["std", "async_executor", "multi_threaded", "bevy_asset", "bevy_log", "bevy_color", "bevy_core_pipeline", "bevy_render", "bevy_camera", "bevy_mesh", "bevy_light", "bevy_pbr", "bevy_window", "bevy_winit", "keyboard", "mouse", "x11", "png", "tonemapping_luts", "zstd_rust"] }
+
+[profile.dev]
+debug = 0
+
+[profile.release]
+opt-level = 3
+debug = 0
+strip = "debuginfo"
+
+[[bin]]
+name = "prototype2-rust"
+path = "src/main.rs"
