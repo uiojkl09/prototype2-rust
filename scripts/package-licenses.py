@@ -3,6 +3,7 @@ import json, pathlib, shutil, sys, urllib.request, urllib.error, urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 
 metadata = json.load(sys.stdin)
+resolved_ids = {node['id'] for node in metadata['resolve']['nodes']}
 out = pathlib.Path(sys.argv[1]) / 'dependency-licenses'
 out.mkdir()
 inventory = []
@@ -33,7 +34,7 @@ def upstream_notices(package, source):
     upstream_cache[key] = files
     return files
 for package in metadata['packages']:
-    if package['source'] is None: continue
+    if package['source'] is None or package['id'] not in resolved_ids: continue
     source = pathlib.Path(package['manifest_path']).parent
     dest = out / (package['name'] + '-' + package['version'])
     files = [p for p in source.iterdir() if p.is_file() and
@@ -59,6 +60,6 @@ for package in metadata['packages']:
         entry['notice_sources'] = [address for name, address, data in upstream]
 (out / 'inventory.json').write_text(json.dumps(inventory, indent=2), encoding='utf-8')
 missing = [p for p in inventory if p['notices'] == 0]
-print(f'Collected notice files for {len(inventory)-len(missing)}/{len(inventory)} resolved crates (includes target/build-only crates)')
+print(f'Collected notice files for {len(inventory)-len(missing)}/{len(inventory)} resolved Windows crates (includes build-only crates)')
 if missing:
     print('Crates with SPDX metadata only: ' + ', '.join(p['name'] for p in missing))

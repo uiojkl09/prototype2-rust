@@ -75,7 +75,9 @@ and sha2 use MIT OR Apache-2.0. Transitive dependencies retain their own license
 Cargo.lock and Cargo metadata identify the exact resolved graph. Package.ps1 collects
 distributed LICENSE/COPYING/NOTICE files, including nested font/asset notices, into
 `dependency-licenses/` beside the binary and records SPDX metadata in inventory.json.
-That directory includes target/build-only dependencies conservatively. Generated
+That directory includes the resolved Windows graph and build-only dependencies
+conservatively; other-platform-only crates are not distributed in this binary.
+Generated
 notices are outside this source repository and contain no game assets.
 When a published crate omits notice files, the packager retrieves its upstream
 notices at the exact Git revision recorded in .cargo_vcs_info.json. Source URLs
