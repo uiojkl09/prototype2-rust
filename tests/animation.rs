@@ -27,7 +27,7 @@ fn fixture(referenced: bool) -> Vec<u8> {
     let mut header = 0u32.to_le_bytes().to_vec();
     string(&mut header, "synthetic");
     header.extend(b"PTRN");
-    header.extend(10f32.to_le_bytes());
+    header.extend(11f32.to_le_bytes());
     header.extend(30f32.to_le_bytes());
     header.extend(1u32.to_le_bytes());
     let mut values = Vec::new();
@@ -100,11 +100,51 @@ fn skeleton() -> Skeleton {
     }
 }
 #[test]
+fn sync_frame_child_is_checked_and_absence_uses_native_zero_default() {
+    let data = fixture(false);
+    let chunks = p3d::parse(&data).unwrap();
+    assert_eq!(
+        animation::clips(&data, &chunks).unwrap()[0].default_sync_frame,
+        0.
+    );
+    let clip = chunks.iter().find(|n| n.id == 0x121000).unwrap();
+    let with_sync = |extra: &[u8]| {
+        let mut children =
+            data[clip.offset + clip.data_size..clip.offset + clip.total_size].to_vec();
+        children.extend(extra);
+        node(
+            p3d::MAGIC,
+            &[],
+            &node(0x121000, clip.payload(&data), &children),
+        )
+    };
+    let payload = [0u32.to_le_bytes(), 3.5f32.to_le_bytes()].concat();
+    let child = node(0x121402, &payload, &[]);
+    let good = with_sync(&child);
+    assert_eq!(
+        animation::clips(&good, &p3d::parse(&good).unwrap()).unwrap()[0].default_sync_frame,
+        3.5
+    );
+    for payload in [
+        [1u32.to_le_bytes(), 0f32.to_le_bytes()].concat(),
+        [0u32.to_le_bytes(), f32::NAN.to_le_bytes()].concat(),
+        vec![0; 7],
+        vec![0; 9],
+    ] {
+        let bad = with_sync(&node(0x121402, &payload, &[]));
+        assert!(animation::clips(&bad, &p3d::parse(&bad).unwrap()).is_err());
+    }
+    let bad = with_sync(&[child.clone(), child].concat());
+    assert!(animation::clips(&bad, &p3d::parse(&bad).unwrap()).is_err());
+}
+#[test]
 fn packed_clip_and_blob_produce_known_rotating_skin_pose() {
     for referenced in [false, true] {
         let data = fixture(referenced);
         let nodes = p3d::parse(&data).unwrap();
         let clip = animation::load_clip(&data, &nodes, "synthetic").unwrap();
+        assert_eq!(clip.info.frame_count, 11.);
+        assert_eq!(clip.info.last_frame(), 10.);
         let skeleton = skeleton();
         let skin = SkinMesh {
             name: "tip".into(),

@@ -7,6 +7,7 @@ pub const B: u16 = 0x2000;
 pub const X: u16 = 0x4000;
 pub const Y: u16 = 0x8000;
 pub const LEFT_SHOULDER: u16 = 0x0100;
+pub const RIGHT_SHOULDER: u16 = 0x0200;
 pub const START: u16 = 0x0010;
 
 /// Layout matches XINPUT_GAMEPAD, including signed thumbstick endpoints.
@@ -109,6 +110,7 @@ pub struct Controls {
     /// Animation-inspection edges; existing viewer travel still uses held A/B.
     pub next_clip: bool,
     pub previous_clip: bool,
+    pub toggle_locomotion: bool,
 }
 
 #[derive(Default)]
@@ -167,6 +169,7 @@ impl Tracker {
             exit: edges & START != 0,
             next_clip: edges & A != 0,
             previous_clip: edges & B != 0,
+            toggle_locomotion: edges & RIGHT_SHOULDER != 0,
         }
     }
 }

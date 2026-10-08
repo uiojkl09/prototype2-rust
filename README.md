@@ -27,6 +27,8 @@ writable directory, and open PowerShell there:
 
 **Animation Xbox controls:** A/B change clips, sticks orbit/zoom, X pause, Y restart,
 LB slow playback and Menu exit. Run, idle, walk, sprint and jump are available.
+**RB toggles locomotion blending:** left-stick magnitude varies idle/walk/run
+weights and shared stride timing; right stick orbits. The character stays in place.
 See [animation evidence and limits](docs/ANIMATION.md). Textures remain deferred
 while animation/state integration takes priority.
 
@@ -78,7 +80,7 @@ All commands accept `--game`, or the `PROTOTYPE2_GAME` environment variable.
 | `capsule` | Recovered AlexPhysicsFactory capsule asset dimensions and provenance offsets |
 | `fight --filter bare/loco --limit 10` | Checked character graphs and selected main movement/capsule tracks, read directly from boot.rcf |
 | `animations --filter heller --limit 40` | Checked character clip headers, names, fps and frame ranges |
-| `animate` | Original skinned Heller playing original clips, with Xbox inspection controls |
+| `animate` | Original skinned Heller playing original clips and recovered idle/walk/run blends, with Xbox inspection controls |
 | `scene` | Selected cell's geometry/collision counts, bounds and limitations |
 | `ray --origin 1266,80,-1932 --direction 0,-1,0` | Experimental geometric collision query |
 | `sweep --origin 1218.130,55.001,-1898.738 --delta 0,-50,0` | Swept asset capsule against real ground triangles; experimental geometry, no movement response |

@@ -48,7 +48,10 @@ module establishes the active locomotion hull or supplies gameplay constants.
 `fight`, `locomotion` and `capsule_state` expose checked graph structures and isolated
 recovered scalar/shape rules. They do not supply a scheduler or game simulation.
 `animation` and `skin` use glam math without Bevy to read/sample/deform original
-character assets. `animation_viewer` is a separate adapter with an inspection clock
+character assets. `animation_driver` supplies native three-stage phase and local
+pose-blend rules with explicit seconds. Action selection, partitions and layering
+remain separate; native quaternion approximation parity has not been established.
+`animation_viewer` is a separate adapter with an inspection clock
 and root-neutral preview policy; it must not become the retail movement contract.
 See FIGHT.md and ANIMATION.md for evidence and remaining behaviors.
 

@@ -1,5 +1,6 @@
 //! Format readers have no renderer or retail-engine dependency.
 pub mod animation;
+pub mod animation_driver;
 pub mod binary;
 pub mod capsule;
 pub mod capsule_state;

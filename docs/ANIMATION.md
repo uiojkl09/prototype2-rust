@@ -2,7 +2,8 @@
 
 Original Heller clips now deform the original character meshes in the independent
 Rust runtime. This is inspection playback: it does not yet execute the game's
-animation state machine, action scheduling, blending, root-motion driver or contacts.
+animation state machine, action scheduling, layered blending, root-motion driver or contacts.
+The recovered standalone idle/walk/run blend now also deforms the character.
 Animation integration takes priority over textures.
 
 ## Run and controller controls
@@ -19,6 +20,16 @@ X pauses, Y restarts, LB slows playback and Menu exits. Focus loss suppresses
 input; connection/focus changes do not create button edges. These are inspection
 controls, not the final retail gameplay mapping.
 
+RB toggles a locomotion blend preview. In that mode the left stick's magnitude
+selects an inspection speed from zero to the main graph's run velocity (4.5),
+and the right stick orbits. Shared phase and velocity-weighted local poses follow
+the recovered standalone driver structure. This stick mapping is an inspection
+control; it does not implement the game's steering/mode selection or actor travel.
+A/B returns to single-clip mode; X pauses, Y resets phase and LB slows the preview.
+Keyboard L toggles the same mode. `--loco-speed 3` starts a fixed inspection speed
+with equal walk/run weights. This cannot be combined with `--sample-frame`; RB
+discards the fixed-speed override. `Animate.ps1 -LocomotionSpeed 3` also supports it.
+
 `animations --filter heller --limit 40` lists bounded headers without rendering.
 `animate --clip <exact-name>` chooses a clip; unsupported channel layouts fail.
 `--sample-frame 10.5` fixes a pose and disables clip switching. `--frames 180
@@ -34,8 +45,10 @@ for that exact x86 binary. The runtime never loads it. Private native analysis,
 decoded payloads, logs and screenshots stay outside source and packages.
 
 `boot.rcf / art\alex\alex.p3d` contains 931 animation headers and three
-92-joint skeletons. Run is at decoded chunk offset **0x77176e**, end frame 21,
-30 fps, with 62 joint groups. Walk is at **0x796c9f**, end frame 37, 30 fps;
+92-joint skeletons. Run is at decoded chunk offset **0x77176e**, frame count 21
+(last frame 20),
+30 fps, with 62 joint groups. Walk is at **0x796c9f**, frame count 37
+(last frame 36), 30 fps;
 `heller_amb_stand` is at **0x667b70** and exercises multiple compressed-data blocks.
 Jump is at **0x75a1d6**, sprint at **0x775ef6**. These offsets identify this corpus.
 The main bare LocoSteer record at **0x51495** in `alex_fig.p3d` resolves idle,
@@ -45,7 +58,8 @@ walk and run hashes to `alex_amb_stand` (**0x3f343**), `heller_loco_walk_n` and
 The main track stores phase -1, all three sync frames -1, blend-in approximately
 0.133333 seconds and blend-out 0.3 seconds. Native begin **0x101e37f0** resolves
 the referenced animations and constructs/reuses a locomotion driver; its phase,
-sync and update policies still require recovery before implementing transitions.
+sync and update policies beyond the standalone subset below still require recovery
+before implementing transitions.
 
 `art.rcf / art\alex\alex_model_main.p3d` supplies selected body/arm geometry.
 Nine supported skin primitives contain **7,978 vertices / 12,463 triangles**.
@@ -57,8 +71,9 @@ left-arm skeleton/drawable is not selected. This is not complete model assembly.
 | Chunk ID | Implemented interpretation |
 | --- | --- |
 | 0x23000 / 0x23001 | Skeleton v1 header and joints: names, ordered parent indices, 16-float affine local bind matrix, twelve additional finite floats, u16/u32 tail |
-| 0x121000 | Animation v0 name, kind, positive finite end frame/fps, cyclic flag |
+| 0x121000 | Animation v0 name, kind, positive finite frame count/fps, cyclic flag |
 | 0x121001 | Joint group v0 name, joint index and direct channel count |
+| 0x121402 | Direct v0 default sync-frame child; finite f32 offset, native zero default when absent |
 | 0x2f00000 | Version 0 ZLIB blob with declared decoded/stored lengths; complete checked stream, maximum 64 MiB |
 | 0x121010 | Version 0 block table, inspected 8192 marker, checked cumulative block sizes covering the blob |
 | 0x121121 | Version 0 referenced key count, offset and block index; frames followed by values aligned to four-byte absolute blob position |
@@ -107,6 +122,62 @@ Presentation delta time advances frames at the asset fps, with a 0.1-second cap;
 inspection loops even non-cyclic clips. Neither that clock nor looping policy is
 the retail scheduler. Asset fps does not identify the simulation tick.
 
+Native wrapper bind **0x10621730** copies the serialized frame count and fps,
+then sets its last frame to count minus one. v0.1.3 labeled the count as an end
+frame and looped over that longer interval; v0.1.4 corrects the field, key bounds,
+fixed-pose range and preview interval. Run's cycle is **20/30 seconds** and walk's
+is **36/30 seconds**, before any locomotion-driver rate adjustment.
+
+The independent `animation_driver::advance_phase` primitive now implements the
+inspected update **0x1062a350** for three distinct, available, nondirectional
+idle/walk/run stages. It selects adjacent velocity stages, linearly weights them,
+drops candidates below 0.01 and normalizes remaining weights. Cycle duration and
+reference velocity are weighted from the surviving stages. Positive reference
+velocity scales supplied dt by current/reference speed; phase advances by that
+scaled dt divided by the weighted cycle duration. Zero duration leaves phase
+unchanged; out-of-cycle phase wraps with the native 0.00001 boundary tolerance.
+The 0.01/0.00001 constants occur at **0x10aa7678 / 0x10aa7674** in this binary.
+Constructor **0x1062a1a0**, stage registration **0x10629f40**, candidate insertion
+**0x10629da0** and clip wrapper bind/getters **0x10621730 / 0x10317410 /
+0x1025b140** corroborate the stage and duration contracts.
+
+Tests cover idle/walk boundaries, halfway walk/run weights, faster-than-final-stage
+playback, candidate trimming, cycle boundaries and invalid input. An installed-data
+check joins the main graph's actual three clips and verifies a 0.12-second walk
+step reaches phase 0.1. This primitive accepts explicit seconds and velocities;
+it does not choose an input mode or tick or execute states.
+Aliases/missing clips, directional candidates, sync/event channels, layers and
+retargeting remain separate policies. Native arithmetic is not bitwise reproduced.
+
+`frame_at_phase` implements the inspected phase mapping **0x1062ab30**: default
+sync offset plus phase times last frame, wrapped over [0,last frame) with the
+0.00001 boundary tolerance from **0x100690d0 / 0x109f02fc**. The native clip
+constructor **0x108120e0** defaults sync to zero; loader **0x10812230** overrides
+it from direct child 0x121402. All 931 inspected headers have one v0 child containing
+zero. Main idle/walk/run child offsets are **0x40822 / 0x7993ea / 0x773b39**.
+The preview requires the main track's all-negative sync array and uses asset
+defaults. Explicit track overrides and event-driven rephasing remain unsupported.
+Tests cover nonzero/negative offsets, wrap boundaries, zero length, overflow and
+malformed/duplicate sync children. The installed walk check maps phase 0.1 to
+frame 3.6. These are explicit data/math primitives, not gameplay transitions.
+
+`sample_locomotion` now samples adjacent idle/walk/run stages at that shared phase.
+Native candidate ordering **0x10628490 / 0x10628360 / 0x10628210** puts greater
+weights first and preserves equal weights for this small candidate list.
+Evaluator **0x1062aee0** accumulates weight and blends each following pose by its
+weight divided by the accumulated total. Command writer **0x1062f910** and skeletal
+dispatch **0x1062de40 / 0x1062f600** connect that coefficient to local-component
+blending. Translation/scale helper **0x1062dfe0** is linear; rotation helper
+**0x1062e110** uses a normalized spherical approximation and flips the incoming
+hemisphere for dot product <= 0. Missing-channel fallback **0x1062bbc0** uses
+base components. This standalone Rust contract supplies bind components as base,
+uses glam SLERP with the inspected hemisphere rule, and composes parents afterward.
+Native SIMD polynomial approximation differences remain; this is not bitwise parity.
+Aliases, nonadjacent weights, partitions, additive layers and retargeting are outside
+the primitive. Independent fixtures check a known blended child position, endpoints,
+antipodal rotations, zero-dot behavior and overflowing composition. Installed-data
+checks sample six speeds on both 92-joint skeletons and reproduce the walk endpoint.
+
 Materials are diagnostic colors. Morph/cloth/expression assembly, constraints,
 retail shaders, motion events, transitions, layered blends, grounded movement and
 camera behavior remain unresolved. Some shoulder/hood geometry visibly overlaps.
@@ -121,8 +192,16 @@ capture reached frame 14.959668, demonstrating advancement rather than a static
 pose. XInput slot 0 was detected; synthetic edge tests cover A/B and held/focus
 behavior. Additional fixed-frame idle, sprint and jump captures were visually
 inspected, with distinct standing/running/airborne poses and unresolved cloth parts.
+The corrected v0.1.4 continuous walk capture reached frame 15.784990 and the actual
+window controls passed again after the loop interval correction.
 The owner has not physically tested the new animation-specific mapping.
 Automated keyboard scan-code input in the actual focused viewer verified next and
 previous clips, a stable paused frame, reset to frame zero and successful exit.
 That test does not simulate or establish physical Xbox input.
+Two shared-phase blend captures were also inspected: speed 3 reached phase
+0.562845 with weights 0/0.5/0.5; speed 0.75 reached phase 0.312983 with weights
+0.5/0.5/0. The renderer showed distinct striding and upright poses. Actual-window
+automation additionally verified blend-mode entry, phase advancement, paused phase
+stability, phase reset and return to clip mode. Synthetic XInput tests cover RB
+connection/focus/held-edge behavior. Physical RB/left-stick use remains untested.
 See VALIDATION.md for the combined test record and STATUS.md for next work.

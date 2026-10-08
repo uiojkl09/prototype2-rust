@@ -22,23 +22,32 @@ fn toggles_require_new_presses_not_connection_or_focus_changes() {
     let mut tracker = Tracker::default();
     let settings = Settings::default();
     let held = RawGamepad {
-        buttons: controller::X | controller::Y | controller::START | controller::A | controller::B,
+        buttons: controller::X
+            | controller::Y
+            | controller::START
+            | controller::A
+            | controller::B
+            | controller::RIGHT_SHOULDER,
         ..Default::default()
     };
     let first = tracker.sample(slots(held), true, settings);
     assert!(!first.toggle_collision && !first.reset && !first.exit);
     assert!(!first.next_clip && !first.previous_clip);
+    assert!(!first.toggle_locomotion);
     tracker.sample(slots(RawGamepad::default()), true, settings);
     let pressed = tracker.sample(slots(held), true, settings);
     assert!(pressed.toggle_collision && pressed.reset && pressed.exit);
     assert!(pressed.next_clip && pressed.previous_clip);
+    assert!(pressed.toggle_locomotion);
     let repeat = tracker.sample(slots(held), true, settings);
     assert!(!repeat.toggle_collision && !repeat.reset && !repeat.exit);
     assert!(!repeat.next_clip && !repeat.previous_clip);
+    assert!(!repeat.toggle_locomotion);
     tracker.sample(slots(held), false, settings);
     let regained = tracker.sample(slots(held), true, settings);
     assert!(!regained.toggle_collision && !regained.reset && !regained.exit);
     assert!(!regained.next_clip && !regained.previous_clip);
+    assert!(!regained.toggle_locomotion);
 }
 
 #[test]

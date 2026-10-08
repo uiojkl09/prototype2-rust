@@ -51,7 +51,8 @@ fn run() -> Result<()> {
                 "--look-speed",
                 "--invert-y",
                 "--clip",
-                "--sample-frame"
+                "--sample-frame",
+                "--loco-speed"
             ]
             .contains(&key.as_str()),
             "unknown option {key}"
@@ -78,6 +79,7 @@ fn run() -> Result<()> {
             "--game",
             "--clip",
             "--sample-frame",
+            "--loco-speed",
             "--frames",
             "--screenshot",
             "--dead-zone",
@@ -208,10 +210,8 @@ fn run() -> Result<()> {
                 "ambiguous main bare locomotion track"
             );
             let infos = animation::clips(&data, &chunks)?;
-            let names = record
-                .steer
-                .as_ref()
-                .unwrap()
+            let track = record.steer.as_ref().unwrap();
+            let names = track
                 .animations_idle_walk_run
                 .iter()
                 .map(|hash| animation::resolve_clip(&infos, *hash).map(|c| c.name.as_str()))
@@ -221,7 +221,8 @@ fn run() -> Result<()> {
                 record.offset, names
             );
             for name in names
-                .into_iter()
+                .iter()
+                .copied()
                 .chain(["heller_loco_run_sprint_n", "heller_loco_jump_from_idle"])
             {
                 if name != clip_name {
@@ -244,20 +245,58 @@ fn run() -> Result<()> {
                 .get("--sample-frame")
                 .map(|s| s.parse())
                 .transpose()?;
+            let locomotion_speed: Option<f32> =
+                options.get("--loco-speed").map(|s| s.parse()).transpose()?;
+            ensure!(
+                locomotion_speed
+                    .is_none_or(|speed| speed.is_finite() && (0. ..=1000.).contains(&speed)),
+                "--loco-speed must be finite and in 0..1000"
+            );
+            ensure!(
+                sample_frame.is_none() || locomotion_speed.is_none(),
+                "--sample-frame and --loco-speed cannot be combined"
+            );
+            let indices: [usize; 3] = names
+                .iter()
+                .map(|name| {
+                    clips
+                        .iter()
+                        .position(|c| c.info.name == *name)
+                        .context("locomotion clip missing from bank")
+                })
+                .collect::<Result<Vec<_>>>()?
+                .try_into()
+                .unwrap();
+            ensure!(
+                track
+                    .sync_frames_idle_walk_run
+                    .iter()
+                    .all(|frame| *frame < 0.),
+                "explicit LocoSteer sync overrides are not supported in this preview"
+            );
+            let sync_frames = indices.map(|i| clips[i].info.default_sync_frame);
             ensure!(
                 sample_frame
-                    .is_none_or(|n| n.is_finite() && n >= 0. && n <= clips[0].info.end_frame),
+                    .is_none_or(|n| n.is_finite() && n >= 0. && n <= clips[0].info.last_frame()),
                 "--sample-frame out of clip range"
             );
             animation_viewer::run(
                 skeletons,
                 meshes,
                 clips,
-                frames,
-                options.get("--screenshot").map(PathBuf::from),
-                sample_frame,
+                animation_viewer::LocomotionPreview {
+                    indices,
+                    velocities: [0., track.velocity_walk, track.velocity_run],
+                    sync_frames,
+                },
+                animation_viewer::Inspection {
+                    stop_after: frames,
+                    screenshot: options.get("--screenshot").map(PathBuf::from),
+                    sample_frame,
+                    locomotion_speed,
+                },
                 settings,
-            );
+            )?;
             return Ok(());
         }
         #[cfg(not(feature = "viewer"))]
@@ -567,8 +606,9 @@ chunks: --limit 40
 meta: --filter <ASCII name or body reference> --limit 40
 fight: --filter <branch path substring> --limit 40 (defaults to boot.rcf / art\\alex\\alex_fig.p3d)
 animations: --filter <clip substring> --limit 40 (character clip headers)
-animate: --clip <name> --sample-frame <frame> --frames <count> --screenshot <private PNG path>
+animate: --clip <name> --sample-frame <frame> --loco-speed <inspection speed> --frames <count> --screenshot <private PNG path>
 Animation inspection: A/B next/previous clip; sticks orbit/zoom; X pause; Y restart; LB slow; Menu exit.
+Animation blend inspection: RB (keyboard L) toggles; left stick varies idle/walk/run speed; right stick orbits.
 ray: --origin x,y,z --direction x,y,z
 capsule: decode the observed AlexPhysicsFactory asset (boot.rcf)
 sweep: --origin x,y,z --delta x,y,z (translation, not velocity; geometric query only)

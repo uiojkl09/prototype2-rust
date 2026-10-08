@@ -25,7 +25,9 @@ fn installed_character_skeletons_and_skin_bind_pose_agree() {
         .unwrap();
     assert_eq!(run.offset, 0x77176e);
     assert_eq!(run.frames_per_second, 30.);
-    assert_eq!(run.end_frame, 21.);
+    assert_eq!(run.frame_count, 21.);
+    assert_eq!(run.last_frame(), 20.);
+    assert!(clips.iter().all(|c| c.default_sync_frame == 0.));
     let clip = animation::load_clip(&data, &chunks, "heller_loco_run_n").unwrap();
     assert_eq!(clip.tracks.len(), 62);
     let start = clip.sample(&skeletons[0], 0.).unwrap();
@@ -41,9 +43,9 @@ fn installed_character_skeletons_and_skin_bind_pose_agree() {
         let clip = animation::load_clip(&data, &chunks, name).unwrap();
         for frame in [
             0.,
-            clip.info.end_frame * 0.25,
-            clip.info.end_frame * 0.5,
-            clip.info.end_frame,
+            clip.info.last_frame() * 0.25,
+            clip.info.last_frame() * 0.5,
+            clip.info.last_frame(),
         ] {
             assert!(
                 clip.sample(&skeletons[0], frame)
@@ -85,6 +87,85 @@ fn installed_character_skeletons_and_skin_bind_pose_agree() {
         names,
         ["alex_amb_stand", "heller_loco_walk_n", "heller_loco_run_n"]
     );
+    let cycles: [f32; 3] = names
+        .iter()
+        .map(|name| {
+            clips
+                .iter()
+                .find(|c| c.name == *name)
+                .unwrap()
+                .cycle_seconds()
+        })
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    assert_eq!(cycles[1], 36. / 30.);
+    assert_eq!(cycles[2], 20. / 30.);
+    let track = main[0].steer.as_ref().unwrap();
+    assert_eq!(track.sync_frames_idle_walk_run, [-1.; 3]);
+    let phase = prototype2_rust::animation_driver::advance_phase(
+        0.,
+        track.velocity_walk,
+        [0., track.velocity_walk, track.velocity_run],
+        cycles,
+        0.12,
+    )
+    .unwrap();
+    assert_eq!(phase.weights, [0., 1., 0.]);
+    assert!((phase.phase - 0.1).abs() < 1e-6);
+    let walk = clips.iter().find(|c| c.name == names[1]).unwrap();
+    assert!(
+        (prototype2_rust::animation_driver::frame_at_phase(
+            phase.phase,
+            walk.last_frame(),
+            walk.default_sync_frame,
+        )
+        .unwrap()
+            - 3.6)
+            .abs()
+            < 1e-6
+    );
+    let stage_clips: Vec<_> = names
+        .iter()
+        .map(|name| animation::load_clip(&data, &chunks, name).unwrap())
+        .collect();
+    let stages = [&stage_clips[0], &stage_clips[1], &stage_clips[2]];
+    for speed in [
+        0.,
+        track.velocity_walk * 0.5,
+        track.velocity_walk,
+        (track.velocity_walk + track.velocity_run) * 0.5,
+        track.velocity_run,
+        track.velocity_run * 2.,
+    ] {
+        let step = prototype2_rust::animation_driver::advance_phase(
+            0.25,
+            speed,
+            [0., track.velocity_walk, track.velocity_run],
+            cycles,
+            0.,
+        )
+        .unwrap();
+        for skeleton in &skeletons {
+            let pose = prototype2_rust::animation_driver::sample_locomotion(
+                skeleton,
+                stages,
+                step.phase,
+                step.weights,
+                [0.; 3],
+            )
+            .unwrap();
+            assert!(pose.iter().all(|m| m.is_finite()));
+            if speed == track.velocity_walk {
+                assert_eq!(
+                    pose,
+                    stage_clips[1]
+                        .sample(skeleton, stage_clips[1].info.last_frame() * 0.25)
+                        .unwrap()
+                );
+            }
+        }
+    }
     let art = Archive::open(game.join("art.rcf")).unwrap();
     let data = p3d::decode(
         &art.read(art.find("art\\alex\\alex_model_main.p3d").unwrap())
@@ -103,7 +184,9 @@ fn installed_character_skeletons_and_skin_bind_pose_agree() {
             );
         }
     }
-    println!("931 clip headers, two 92-joint skeletons, nine skinned meshes; bind pose preserved");
+    println!(
+        "931 clip headers, two 92-joint skeletons, nine skinned meshes; bind pose and native locomotion blend endpoints checked"
+    );
 }
 
 #[test]

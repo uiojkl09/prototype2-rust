@@ -25,9 +25,19 @@ pub struct ClipInfo {
     pub name: String,
     pub offset: usize,
     pub kind: [u8; 4],
-    pub end_frame: f32,
+    pub frame_count: f32,
     pub frames_per_second: f32,
     pub cyclic: bool,
+    pub default_sync_frame: f32,
+}
+impl ClipInfo {
+    /// The native clip wrapper uses the serialized count minus one as its end.
+    pub fn last_frame(&self) -> f32 {
+        self.frame_count - 1.
+    }
+    pub fn cycle_seconds(&self) -> f32 {
+        self.last_frame() / self.frames_per_second
+    }
 }
 /// Resolve a graph's case-preserving animation hash against actual clip names.
 /// Missing or ambiguous references fail rather than selecting a similar label.
@@ -140,19 +150,20 @@ pub fn skeleton(data: &[u8], chunks: &[Chunk], wanted: &str) -> Result<Skeleton>
     selected.with_context(|| format!("skeleton {wanted} not found"))
 }
 pub fn clips(data: &[u8], chunks: &[Chunk]) -> Result<Vec<ClipInfo>> {
+    let tree = children(chunks);
     chunks
         .iter()
-        .filter(|n| n.id == 0x121000)
-        .map(|n| {
+        .enumerate()
+        .filter(|(_, n)| n.id == 0x121000)
+        .map(|(index, n)| {
             let mut c = Cursor::new(n.payload(data));
             ensure!(c.u32()? == 0, "unsupported animation version");
             let name = c.string8()?;
             let kind = c.take(4)?.try_into()?;
-            let end_frame = c.f32()?;
+            let frame_count = c.f32()?;
             let frames_per_second = c.f32()?;
             ensure!(
-                end_frame > 0.
-                    && end_frame <= 32767.
+                (1. ..=32768.).contains(&frame_count)
                     && frames_per_second > 0.
                     && frames_per_second <= 1000.,
                 "invalid animation timing"
@@ -160,13 +171,25 @@ pub fn clips(data: &[u8], chunks: &[Chunk]) -> Result<Vec<ClipInfo>> {
             let cyclic = c.u32()?;
             ensure!(cyclic <= 1, "invalid animation cyclic flag");
             complete(&c)?;
+            // Native construction defaults to zero; the direct v0 child overrides it.
+            let mut sync = None;
+            for &child in tree.get(&index).into_iter().flatten() {
+                if chunks[child].id == 0x121402 {
+                    ensure!(sync.is_none(), "duplicate animation sync frame");
+                    let mut c = Cursor::new(chunks[child].payload(data));
+                    ensure!(c.u32()? == 0, "unsupported animation sync version");
+                    sync = Some(c.f32()?);
+                    complete(&c)?;
+                }
+            }
             Ok(ClipInfo {
                 name,
                 offset: n.offset,
                 kind,
-                end_frame,
+                frame_count,
                 frames_per_second,
                 cyclic: cyclic != 0,
+                default_sync_frame: sync.unwrap_or(0.),
             })
         })
         .collect()
@@ -176,12 +199,14 @@ pub fn world_matrices(joints: &[Joint], local: &[Mat4]) -> Result<Vec<Mat4>> {
     let mut out: Vec<Mat4> = Vec::with_capacity(joints.len());
     for (i, (joint, matrix)) in joints.iter().zip(local).enumerate() {
         ensure!(matrix.is_finite(), "non-finite joint pose");
-        out.push(if let Some(p) = joint.parent {
+        let world = if let Some(p) = joint.parent {
             ensure!(p < i, "invalid joint parent ordering");
             out[p] * *matrix
         } else {
             *matrix
-        });
+        };
+        ensure!(world.is_finite(), "joint composition overflow");
+        out.push(world);
     }
     Ok(out)
 }
@@ -225,10 +250,29 @@ pub struct Clip {
     pub info: ClipInfo,
     pub tracks: HashMap<String, JointTrack>,
 }
+#[derive(Clone, Copy, Debug)]
+pub struct LocalTransform {
+    pub scale: Vec3,
+    pub rotation: Quat,
+    pub translation: Vec3,
+}
+impl LocalTransform {
+    pub fn matrix(self) -> Mat4 {
+        Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
+    }
+}
 impl Clip {
     /// Explicit frame sampling allows deterministic checks independent of render dt.
     /// Time wrapping and state transitions are the caller's responsibility.
     pub fn sample(&self, skeleton: &Skeleton, frame: f32) -> Result<Vec<Mat4>> {
+        let local = self.sample_local(skeleton, frame)?;
+        world_matrices(
+            &skeleton.joints,
+            &local.iter().map(|p| p.matrix()).collect::<Vec<_>>(),
+        )
+    }
+    /// Sample local components before composition, allowing recovered clip blends.
+    pub fn sample_local(&self, skeleton: &Skeleton, frame: f32) -> Result<Vec<LocalTransform>> {
         ensure!(frame.is_finite(), "non-finite animation frame");
         let mut local = Vec::with_capacity(skeleton.joints.len());
         for joint in &skeleton.joints {
@@ -256,13 +300,13 @@ impl Clip {
                     translation = keys.values[a].lerp(keys.values[b], t);
                 }
             }
-            local.push(Mat4::from_scale_rotation_translation(
+            local.push(LocalTransform {
                 scale,
                 rotation,
                 translation,
-            ));
+            });
         }
-        world_matrices(&skeleton.joints, &local)
+        Ok(local)
     }
 }
 
@@ -428,7 +472,7 @@ pub fn load_clip(data: &[u8], chunks: &[Chunk], wanted: &str) -> Result<Clip> {
             for _ in 0..keys.0 {
                 let f = keys.1.u16()?;
                 ensure!(
-                    f32::from(f) <= info.end_frame && frames.last().is_none_or(|last| *last < f),
+                    f32::from(f) <= info.last_frame() && frames.last().is_none_or(|last| *last < f),
                     "invalid animation key order/range"
                 );
                 frames.push(f);

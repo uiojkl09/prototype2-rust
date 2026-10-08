@@ -32,12 +32,17 @@ format/research/validation notes; do not repeat the archive investigation.
 - `animate` plays run, idle, walk, sprint and jump; Xbox A/B select clips, X pauses,
   Y restarts, sticks orbit/zoom and Menu exits. Fixed-pose GPU captures and continuous
   playback verified. Animation-specific physical controls have not been owner-tested.
+- Native frame-count-minus-one timing and an isolated three-stage locomotion phase
+  rule: adjacent velocity weights, candidate trimming, weighted durations and speed
+  scaling, checked sync offsets and frame mapping. Local idle/walk/run pose blending
+  now reaches the renderer; RB/left stick inspect it in place. State scheduling and
+  native quaternion approximation parity remain separate work, documented in ANIMATION.md.
 
 ## Incomplete / unknown
 
 - Materials/textures, instance transforms, local prop placement, visibility, full
   scene assembly, cell streaming and full model/morph/cloth assembly.
-- Animation state transitions, blending/events, root-motion integration and native
+- Animation state transitions, layered/additive blending/events, root-motion integration and native
   interpolation parity. Current playback loops clips in place using a preview clock.
 - Collision tag/filter semantics, 232,810 selected ground-tail bytes, box/convex
   primitives, active player hull/transforms, retail contact response and acceleration
