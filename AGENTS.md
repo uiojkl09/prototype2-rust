@@ -5,6 +5,10 @@ Read README.md, STATUS.md, docs/FORMATS.md, docs/RESEARCH.md and docs/VALIDATION
 The objective is an independent, faithful Prototype 2 runtime. Current code is a
 data reader and experimental section viewer. Maintain the distinction. A successful
 build is not gameplay parity. Do not replace blocked work with invented mechanics.
+Perfect recreation is the target: keep original mechanics, input response, timing,
+camera and state transitions as acceptance criteria. Xbox controller support is an
+owner requirement. A geometric query is an investigation tool, not recovered retail
+contact response; decoded default factory dimensions are not a confirmed active hull.
 
 Work directly with the user. Do not spawn subagents or delegate unless the user
 explicitly requests it. Continue authorized research, implementation and verification.

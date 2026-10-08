@@ -1,5 +1,7 @@
 //! Format readers have no renderer or retail-engine dependency.
 pub mod binary;
+pub mod capsule;
+pub mod collision;
 pub mod controller;
 pub mod install;
 pub mod meta;

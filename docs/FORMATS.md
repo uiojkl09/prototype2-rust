@@ -110,3 +110,9 @@ The `meta` command searches names and bounded ASCII references in opaque bodies,
 returning absolute decoded-P3D offsets and sizes. It does not export bodies or infer
 the meaning of nearby numeric values. It also works in files without merged geometry.
 Character collision-related locations and remaining schema work are in MOVEMENT.md.
+
+The separate `capsule` reader decodes the inspected AlexPhysicsFactory body using
+selectively inspected native field registration and capsule consumers. See CAPSULE.md
+for exact fields/offsets, dimensions, supported version/token and remaining unknowns.
+Other META bodies remain opaque. The swept query is independent geometry and does
+not recover the retail solver, filtering, transforms or state-dependent capsule use.

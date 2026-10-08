@@ -37,10 +37,21 @@ RCF indexing and tested RZ/P3D envelope reading no longer require novel reverse
 engineering. Merged vertex/index decoding is implemented for one section. Material
 bindings, instanced transforms, animation tracks, collision flags/trees and primitive
 types need additional format work. Movement rules, capsule/contact behavior, camera
-and mission behavior require original-game measurements and likely selective native
-executable analysis. No movement constants or engine routines have been recovered.
+and mission behavior require original-game measurements and selective native
+executable analysis. Capsule field registration/endpoint/bounds routines have now
+been inspected; their authored evidence is in CAPSULE.md. No original movement
+constants, timing or retail contact response have been accepted.
 
 Ghidra was not needed for this archive/viewer milestone and was not run. When needed,
 identify the hashed binary, inspect relevant string/import references and routines,
 keep its project private, and publish only original format/behavior descriptions.
 Use gamedb if a selective decompilation corpus makes indexing worthwhile.
+
+The capsule prerequisite used already-installed pefile 2024.8.26 and Capstone 5.0.7
+for bounded read-only PE/RTTI and native-function inspection outside the repository.
+No tool installation, proprietary code port, retail execution or patch was required.
+Initialization scripts were structurally inspected privately as Lua 5.1 bytecode
+with 32-bit float numbers. Selected script constants identify locomotion setting
+accessors; they do not establish walking/jumping values. Fight-track schemas/native
+consumers remain the next investigation target. Private Lua/disassembly files are
+not runtime dependencies or public deliverables.

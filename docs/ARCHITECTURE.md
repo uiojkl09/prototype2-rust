@@ -39,5 +39,11 @@ controller slots periodically. This backend needs no Bevy gamepad plugin/depende
 Gameplay input mapping/timing must be recovered separately. The `meta` reader exposes
 checked object envelopes/reference offsets, leaving unknown body schemas opaque.
 
+`capsule` now decodes the single inspected character factory using recovered native
+schema/geometry evidence. `collision` provides an independent swept geometric query
+for investigation, with no retail solver, integration or renderer dependency.
+Commands retain unknown tags and explicitly report overlap/nonconvergence. Neither
+module establishes the active locomotion hull or supplies gameplay constants.
+
 The design was informed by [IW4L's asset-loading separation](https://github.com/vladtrc/iw4L/blob/a2f4e0b8573eeb828001f8ee757b5b724eee196f/docs/MAP-LOAD.md)
 and explicit simulation input/time. None of its game-specific engine code is reused.

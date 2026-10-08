@@ -1,4 +1,4 @@
-# Initial movement milestone: blocked prerequisites and comparison protocol
+# Initial movement milestone: recovered prerequisites and comparison protocol
 
 No Prototype 2 movement slice is implemented yet. The free camera has arbitrary
 inspection speed and passes through walls. It must not be presented as recovered
@@ -11,9 +11,12 @@ The v0.1.1 investigation inspected the actual character and startup packages. In
 definition at 0x3afa named AlexPhysicsFactory, type
 `ravenphysics::SimplePhysicsObjectFactory`. Its data child at 0x3b8d contains a
 128-byte body beginning at 0x3b9d, with `CollisionCapsuleFactory` referenced at
-0x3bb3. This identifies a serialized factory lead; its fields and which runtime
-states use that shape are not yet decoded. Nearby floats must not be assumed to
-mean radius/height without a schema or inspected native consumer.
+0x3bb3. Selective native inspection has now recovered this factory's field names
+and capsule geometry. The reader reports centre (0,0.175,0), axis (0,1,0), segment
+half-length 0.175 and radius 0.5. [CAPSULE.md](CAPSULE.md) records the exact schema,
+native evidence and reproducible swept queries. Runtime states/transforms and
+fight-track shape changes remain unknown; this default is not an accepted active
+locomotion hull.
 
 `art\startup_tod.p3d.rz` has a metadata definition at decoded offset 0xbe4bd of type
 `proto::AnalyseCollisionParams`, with a 40-byte body at 0xbe554. Its parameter
@@ -30,9 +33,9 @@ The new reader can reproduce the metadata locations without private extraction:
 .\prototype2-rust.exe meta --game 'F:\SteamLibrary\steamapps\common\Prototype 2' --archive boot.rcf --entry 'art\startup_tod.p3d.rz' --filter AnalyseCollisionParams
 ```
 
-Next recover these object/fight schemas and selectively inspect their native
-consumers if necessary. Keep binary bodies/decompiler output private. No movement
-constants or contact rules have been accepted from these references alone. Controller
+Next recover the fight schemas/state transitions and remaining metadata/native
+consumers. Keep binary bodies/decompiler output private. No movement constants or
+retail contact rules have been accepted from these references alone. Controller
 input is now available and owner-tested; its dead zones/look speed are inspection
 preferences, separate from the original game's gameplay input response.
 

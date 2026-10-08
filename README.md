@@ -66,8 +66,10 @@ All commands accept `--game`, or the `PROTOTYPE2_GAME` environment variable.
 | `list --filter Cell_29 --limit 20` | Matching entries, offsets and stored sizes |
 | `chunks --limit 30` | Bounded structural listing and chunk-ID histogram |
 | `meta --filter CollisionCapsuleFactory` | Checked metadata envelopes and reference offsets; body schemas remain unknown |
+| `capsule` | Recovered AlexPhysicsFactory capsule asset dimensions and provenance offsets |
 | `scene` | Selected cell's geometry/collision counts, bounds and limitations |
 | `ray --origin 1266,80,-1932 --direction 0,-1,0` | Experimental geometric collision query |
+| `sweep --origin 1218.130,55.001,-1898.738 --delta 0,-50,0` | Swept asset capsule against real ground triangles; experimental geometry, no movement response |
 | `view` | Standalone Bevy viewer of the selected cell |
 | `controller --seconds 15` | Xbox/XInput raw and processed input diagnostics; no game path required |
 
@@ -78,8 +80,11 @@ scene layouts produce errors. Reader support is broader than scene interpretatio
 
 Read [format evidence](docs/FORMATS.md), [research assessment](docs/RESEARCH.md),
 [architecture](docs/ARCHITECTURE.md), [validation](docs/VALIDATION.md) and
-[movement comparison protocol](docs/MOVEMENT.md). Small changes should identify the
-data/build tested and preserve reader validation. Do not attach game files or dumps.
+[movement comparison protocol](docs/MOVEMENT.md). The
+[recovered capsule/query evidence](docs/CAPSULE.md) describes the next collision
+prerequisite. The default asset dimensions do not yet identify an active locomotion
+hull. Small changes should identify the data/build tested and preserve reader
+validation. Do not attach game files or dumps.
 
 Original project code is MIT licensed. [THIRD_PARTY.md](THIRD_PARTY.md) records source
 lineage and notices. Prototype 2 assets and trademarks belong to their owners; this

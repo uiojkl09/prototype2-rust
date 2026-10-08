@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail, ensure};
-use prototype2_rust::{controller, install, meta, p3d, rcf::Archive, scene};
+use prototype2_rust::{capsule, collision, controller, install, meta, p3d, rcf::Archive, scene};
 use std::{collections::BTreeMap, path::PathBuf};
 #[cfg(feature = "viewer")]
 mod viewer;
@@ -41,6 +41,7 @@ fn run() -> Result<()> {
                 "--screenshot",
                 "--origin",
                 "--direction",
+                "--delta",
                 "--seconds",
                 "--dead-zone",
                 "--look-speed",
@@ -59,6 +60,7 @@ fn run() -> Result<()> {
     }
     let allowed: &[&str] = match command.as_str() {
         "inspect" => &["--game"],
+        "capsule" => &["--game"],
         "verify" => &["--game", "--archive"],
         "scan" => &["--game", "--archive"],
         "list" => &["--game", "--archive", "--filter", "--limit"],
@@ -66,6 +68,7 @@ fn run() -> Result<()> {
         "meta" => &["--game", "--archive", "--entry", "--filter", "--limit"],
         "scene" => &["--game", "--archive", "--entry"],
         "ray" => &["--game", "--archive", "--entry", "--origin", "--direction"],
+        "sweep" => &["--game", "--archive", "--entry", "--origin", "--delta"],
         "view" => &[
             "--game",
             "--archive",
@@ -141,6 +144,14 @@ fn run() -> Result<()> {
             "{}",
             serde_json::to_string_pretty(&install::fingerprint(&game)?)?
         );
+        return Ok(());
+    }
+    if command == "capsule" {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&character_factory(&game)?)?
+        );
+        println!("Recovered asset factory only; locomotion-state overrides remain unknown.");
         return Ok(());
     }
     let archive = options
@@ -287,6 +298,33 @@ fn run() -> Result<()> {
     if command == "scene" {
         return Ok(());
     }
+    if command == "sweep" {
+        let vector = |key: &str| -> Result<[f64; 3]> {
+            let values: Vec<f64> = options
+                .get(key)
+                .with_context(|| format!("{key} x,y,z is required"))?
+                .split(',')
+                .map(str::parse)
+                .collect::<std::result::Result<_, _>>()?;
+            ensure!(
+                values.len() == 3 && values.iter().all(|x| x.is_finite()),
+                "invalid {key}"
+            );
+            Ok([values[0], values[1], values[2]])
+        };
+        let factory = character_factory(&game)?;
+        let origin = vector("--origin")?;
+        let delta = vector("--delta")?;
+        let hit = collision::sweep(&world.collision, &factory.shape, origin, delta, 0.)?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "factory": factory, "origin": origin, "delta": delta, "hit": hit,
+                "query": "Two-sided geometric capsule translation; no retail filtering or movement response"
+            }))?
+        );
+        return Ok(());
+    }
     if command == "ray" {
         let vec3 = |key: &str| -> Result<[f32; 3]> {
             let s = options
@@ -341,17 +379,25 @@ fn run() -> Result<()> {
     #[cfg(not(feature = "viewer"))]
     bail!("viewer disabled; build with default features")
 }
+fn character_factory(game: &std::path::Path) -> Result<capsule::Factory> {
+    let boot = Archive::open(game.join("boot.rcf"))?;
+    let raw = boot.read(boot.find("art\\alex\\alex_tod.p3d")?)?;
+    let data = p3d::decode(&raw)?;
+    capsule::load(&data, &p3d::parse(&data)?).context("read observed AlexPhysicsFactory")
+}
 fn help() {
     println!(
         "prototype2-rust: experimental retail-data viewer, NOT a playable reimplementation
 
-Commands: inspect | verify | scan | list | chunks | meta | scene | ray | view | controller
+Commands: inspect | verify | scan | list | chunks | meta | capsule | scene | ray | sweep | view | controller
 Game commands require --game <Prototype 2 install directory> (or PROTOTYPE2_GAME)
 Selection: --archive cells.rcf --entry <internal path>
 list: --filter <substring> --limit 40
 chunks: --limit 40
 meta: --filter <ASCII name or body reference> --limit 40
 ray: --origin x,y,z --direction x,y,z
+capsule: decode the observed AlexPhysicsFactory asset (boot.rcf)
+sweep: --origin x,y,z --delta x,y,z (translation, not velocity; geometric query only)
 view: --frames <at least 30> --screenshot <PNG path outside repository>
 controller: --seconds <0..60> (no game installation needed)
 view/controller preferences: --dead-zone <0..0.9> --look-speed <0.1..10 rad/s> --invert-y <true|false>

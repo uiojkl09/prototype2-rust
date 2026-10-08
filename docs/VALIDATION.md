@@ -24,6 +24,9 @@ record for these tested files. The new executable targets x64 MSVC independently
 | --- | --- | --- |
 | Seven synthetic tests | Passed | Malformed/truncated/nested P3D, RZ size/checksum/trailer/cap, RCF name/range/alignment rejection and geometric nearest-ray behavior |
 | v0.1.1 controller/metadata tests | Five additional tests passed (12 synthetic total) | Analog stick/dead-zone behavior, button edges, focus/disconnect/reconnect/multiple pads/inversion; metadata reference offsets and malformed envelope lengths |
+| Capsule/collision prerequisite tests | Seven additional tests passed (19 synthetic total) | Checked body identity/truncation/dimensions, fast wall sweeps, both windings, tangent floor, edge/side contacts, overlap, bad indices and degenerate/endpoint contacts |
+| Actual character factory | Recovered centre (0,0.175,0), axis (0,1,0), extent 0.175, radius 0.5 | Inspected asset schema corroborated by native field registration/geometry; active locomotion use still unknown |
+| Actual swept-capsule query | Third opt-in retail test passed; floor contact fraction 0.2300088813 on a 50-unit downward translation | Capsule query against real patch agrees with ray-minus-radius within 0.002 units; no retail collision-response comparison |
 | All RCF indexes | 12 archives; 26,385 entries passed | Metadata, hash joins, bounds, alignment, uniqueness and non-overlap |
 | Full cells.rcf scan | 2,969 P3D files; 551,832,928 stored bytes; 1,219,150,189 decoded bytes; 811,757 chunks | Every selected archive payload decoded; complete structural traversal passed |
 | Scan timing | 29.403 seconds in an unoptimized core build | A single local scan measurement, not runtime performance |
@@ -44,7 +47,8 @@ The metadata inspector reproduced the two character/startup leads in MOVEMENT.md
 The v0.1.0 hosted CI build/check step passed, but its packaging step failed while
 loading Cargo JSON passed through PowerShell. v0.1.1 reads that metadata directly
 from Cargo in Python, avoiding the native text pipe. Local packaging is checked;
-consult GitHub Actions for the current hosted packaging result.
+v0.1.1 main hosted build, package and artifact-upload steps subsequently passed.
+Consult GitHub Actions for later hosted results.
 
 The viewer was checked with local screenshots, which remain outside the public
 repository/package. Screenshots reveal plain debug geometry and omitted dressing;
